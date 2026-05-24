@@ -1,0 +1,110 @@
+@import "tailwindcss";
+
+@theme {
+  --font-sans: "Inter", ui-sans-serif, system-ui, sans-serif;
+  --font-serif: "Cormorant Garamond", Georgia, serif;
+  --font-script: "Great Vibes", cursive;
+
+  --color-cream: #faf8f5;
+  --color-warm-dark: #2c2825;
+  --color-warm-mid: #6b6560;
+  --color-warm-light: #b0a99f;
+  --color-border: #e8e2da;
+
+  --color-blush: #c9a0a0;
+  --color-blush-light: #f2e0e0;
+  --color-blush-pale: #fdf6f6;
+
+  --color-sage: #8faf8f;
+  --color-sage-light: #e8efe8;
+  --color-sage-pale: #f4f7f4;
+
+  --color-mist: #8fa8bf;
+  --color-mist-light: #e8eff5;
+  --color-mist-pale: #f4f7fa;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  height: 100%;
+}
+
+body {
+  background-color: var(--color-cream);
+  color: var(--color-warm-dark);
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+}
+
+::selection {
+  background-color: var(--color-blush-light);
+}
+
+::-webkit-scrollbar {
+  width: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background-color: var(--color-border);
+  border-radius: 3px;
+}
+
+/* Intro animations */
+@keyframes drawStroke {
+  to { stroke-dashoffset: 0; }
+}
+
+@keyframes fillIn {
+  to { opacity: 1; }
+}
+
+@keyframes revealText {
+  0%   { opacity: 0; filter: blur(6px); transform: translateY(12px); }
+  100% { opacity: 1; filter: blur(0);   transform: translateY(0); }
+}
+
+@keyframes fadeUp {
+  0%   { opacity: 0; transform: translateY(8px); }
+  100% { opacity: 1; transform: translateY(0); }
+}
+
+.rosie-sentence {
+  opacity: 0;
+  animation: revealText 0.8s cubic-bezier(0.25, 0.46, 0.45, 0.94) forwards;
+}
+
+.rosie-input-reveal {
+  opacity: 0;
+  animation: fadeUp 0.6s ease forwards;
+}
+
+/* Chat message prose — minimal, warm */
+.message-prose p {
+  margin: 0 0 0.75em;
+}
+
+.message-prose p:last-child {
+  margin-bottom: 0;
+}
+
+.message-prose ul,
+.message-prose ol {
+  margin: 0.5em 0 0.75em;
+  padding-left: 1.25em;
+}
+
+.message-prose li {
+  margin-bottom: 0.25em;
+}
+
+.message-prose strong {
+  font-weight: 600;
+}
