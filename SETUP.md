@@ -9,9 +9,9 @@
    - Project URL → `SUPABASE_URL` and `NEXT_PUBLIC_SUPABASE_URL` (base URL only, no `/rest/v1` suffix)
    - `anon` `public` key → `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` (or `NEXT_PUBLIC_SUPABASE_ANON_KEY`)
    - `service_role` secret key → `SUPABASE_SERVICE_ROLE_KEY`
-5. Under **Authentication → URL Configuration**, add your site URL and redirect URL:
-   - Site URL: `http://localhost:3000` (or your Vercel URL)
-   - Redirect URLs: `http://localhost:3000/auth/callback` (and production equivalent)
+5. Under **Authentication → URL Configuration**, add your site URL and redirect URLs. Production is already configured as:
+   - Site URL: `https://rosie-wedding-planner.vercel.app`
+   - Redirect URLs: `https://rosie-wedding-planner.vercel.app/auth/callback`, `http://localhost:3000/**`, `https://*-cburns33s-projects.vercel.app/**`
 6. Under **Authentication → Providers → Email**, ensure email sign-in is enabled (magic link)
 
 ## 2. Anthropic API key
