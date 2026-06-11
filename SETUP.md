@@ -48,7 +48,20 @@ vercel
 
 Add the same environment variables as `.env.local` (do **not** include `DISABLE_AUTH` in production).
 
+For Sentry source maps on Vercel, also add `SENTRY_AUTH_TOKEN` (create at [sentry.io/settings/auth-tokens](https://sentry.io/settings/auth-tokens/) with `project:releases` and `org:read` scopes).
+
 After deploying, share the URL with Kelsie.
+
+## 5. Sentry (error monitoring)
+
+Rosie reports crashes and server errors to [Sentry](https://talos-advisory.sentry.io) (`talos-advisory/javascript-nextjs`). Chat message bodies are scrubbed before upload; session replay is off.
+
+**Local:** copy DSN values from `.env.local.example` into `.env.local` (or use the values already there after setup).
+
+**Vercel:** add `NEXT_PUBLIC_SENTRY_DSN`, `SENTRY_DSN`, and `SENTRY_AUTH_TOKEN`.
+
+To verify, temporarily throw in an API route and check the Sentry Issues dashboard within ~30 seconds.
+
 
 ## How it works
 
