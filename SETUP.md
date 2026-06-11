@@ -1,5 +1,12 @@
 # Rosie — Setup Guide
 
+**Production (live):** https://rosie-wedding-planner.vercel.app  
+**Repo:** https://github.com/cburns33/rosie-wedding-planner
+
+This guide covers first-time setup and where things live. Day-to-day, you mostly push code to GitHub and Vercel redeploys. See **Ongoing maintenance** at the bottom.
+
+---
+
 ## 1. Supabase
 
 1. Create a new project at [supabase.com](https://supabase.com)
@@ -39,26 +46,48 @@ DISABLE_AUTH=true
 
 This bypasses magic-link sign-in **only when `NODE_ENV` is not `production`**. Remove the line to test the real sign-in flow. Do not set this on Vercel.
 
-## 4. Deploy to Vercel
+## 4. Vercel (hosting)
+
+**Already set up:** project `rosie-wedding-planner` on team `cburns33s-projects`, linked to GitHub. Pushes to `main` trigger production deploys.
+
+Production URL: https://rosie-wedding-planner.vercel.app
+
+### Environment variables on Vercel
+
+These are configured for **Production** and **Development**. Copy from `.env.local.example` / your local `.env.local`:
+
+| Variable | Notes |
+|----------|--------|
+| `ANTHROPIC_API_KEY` | Server only |
+| `SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_URL` | Same base URL |
+| `SUPABASE_SERVICE_ROLE_KEY` | Server only |
+| `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` | Public |
+| `ALLOWED_EMAILS` | Comma-separated allowlist |
+| `NEXT_PUBLIC_SENTRY_DSN`, `SENTRY_DSN` | Sentry |
+| `SENTRY_AUTH_TOKEN` | Build-time source maps |
+
+Do **not** set `DISABLE_AUTH` on Vercel.
+
+**Preview deploys (optional):** if you use PR preview URLs, add the same variables for the Preview environment in the [Vercel env settings](https://vercel.com/cburns33s-projects/rosie-wedding-planner/settings/environment-variables).
+
+### Manual deploy (if needed)
 
 ```bash
-npm i -g vercel
-vercel
+npx vercel link --project rosie-wedding-planner --scope cburns33s-projects
+npx vercel --prod
 ```
-
-Add the same environment variables as `.env.local` (do **not** include `DISABLE_AUTH` in production).
-
-For Sentry source maps on Vercel, also add `SENTRY_AUTH_TOKEN` (create at [sentry.io/settings/auth-tokens](https://sentry.io/settings/auth-tokens/) with `project:releases` and `org:read` scopes).
-
-After deploying, share the URL with Kelsie.
 
 ## 5. Sentry (error monitoring)
 
 Rosie reports crashes and server errors to [Sentry](https://talos-advisory.sentry.io) (`talos-advisory/javascript-nextjs`). Chat message bodies are scrubbed before upload; session replay is off.
 
-**Local:** copy DSN values from `.env.local.example` into `.env.local` (or use the values already there after setup).
+SDK files: `instrumentation-client.ts`, `sentry.server.config.ts`, `sentry.edge.config.ts`, `instrumentation.ts`, `lib/sentry-scrub.ts`, `app/global-error.tsx`.
 
-**Vercel:** add `NEXT_PUBLIC_SENTRY_DSN`, `SENTRY_DSN`, and `SENTRY_AUTH_TOKEN`.
+**Local:** DSN + optional `SENTRY_AUTH_TOKEN` in `.env.local` (see `.env.local.example`).
+
+**Vercel:** `NEXT_PUBLIC_SENTRY_DSN`, `SENTRY_DSN`, and `SENTRY_AUTH_TOKEN` (already set for production).
+
+Create or rotate tokens at [sentry.io/settings/auth-tokens](https://sentry.io/settings/auth-tokens/) (`project:releases` + `org:read` is enough; full admin also works).
 
 To verify, temporarily throw in an API route and check the Sentry Issues dashboard within ~30 seconds.
 
@@ -96,3 +125,21 @@ The system prompt lives in `lib/system-prompt.ts`. The RTF in the repo root is t
 ## Model
 
 Currently using `claude-sonnet-4-6`. To change, update `model` in `app/api/chat/route.ts`.
+
+---
+
+## Ongoing maintenance
+
+You do not need to operate Sentry, Vercel, or Supabase on a schedule. For a single-user gift app, this is enough:
+
+| If… | Then… |
+|-----|--------|
+| You change the app | Push to `main` on GitHub. Vercel redeploys. |
+| Kelsie cannot log in | Check Supabase **Authentication → URL Configuration** still matches the production URL (section 1 above). |
+| Something breaks in production | Open [Sentry Issues](https://talos-advisory.sentry.io/issues/), fix code, push again. |
+| You work locally without magic links | Keep `DISABLE_AUTH=true` in `.env.local` only. |
+| You hand off to Kelsie | Share https://rosie-wedding-planner.vercel.app and confirm her email is in `ALLOWED_EMAILS`. |
+
+Billing: all three services have free tiers; one active user should stay free or very cheap. Optional: glance at usage once a month.
+
+Architecture and file map: `PROJECT.md`. Feature specs: `prd/`.

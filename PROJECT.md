@@ -10,7 +10,36 @@ A personalized wedding planning AI agent built as an engagement gift from Chase 
 - **Anthropic API** — `claude-sonnet-4-6`
 - **Supabase** — Postgres + magic-link auth via `@supabase/ssr`
 - **Tailwind CSS v4** — CSS-based theme config (no tailwind.config.ts)
-- **Vercel** — deploy target
+- **Vercel** — hosting ([rosie-wedding-planner.vercel.app](https://rosie-wedding-planner.vercel.app))
+- **Sentry** — error monitoring (`talos-advisory/javascript-nextjs`; chat payloads scrubbed, no session replay)
+
+---
+
+## Production
+
+| What | Where |
+|------|--------|
+| Live app | https://rosie-wedding-planner.vercel.app |
+| GitHub | [cburns33/rosie-wedding-planner](https://github.com/cburns33/rosie-wedding-planner) |
+| Vercel project | `cburns33s-projects/rosie-wedding-planner` (auto-deploys on push to `main`) |
+| Supabase project | `kmyegwklllfjgoxpnuep` (auth + Postgres) |
+| Sentry project | [talos-advisory/javascript-nextjs](https://talos-advisory.sentry.io) |
+
+Push to `main` → Vercel builds and deploys. Sentry source maps upload during the build (`SENTRY_AUTH_TOKEN` on Vercel).
+
+---
+
+## Ongoing maintenance (minimal)
+
+Nothing here needs weekly attention. Typical touch points:
+
+- **Push code** → GitHub → Vercel redeploys automatically.
+- **Kelsie cannot sign in** → Supabase **Authentication → URL Configuration** must still list the production URL and callback (see `SETUP.md`).
+- **Something broke in prod** → Check [Sentry Issues](https://talos-advisory.sentry.io/issues/); fix code and push.
+- **Local dev without magic links** → `DISABLE_AUTH=true` in `.env.local` only. Never on Vercel.
+- **Before Kelsie uses it for real** → Confirm she has the production URL and her email is in `ALLOWED_EMAILS` on Vercel.
+
+Full setup and env var list: `SETUP.md`.
 
 ---
 
@@ -38,6 +67,11 @@ ALLOWED_EMAILS=                       # comma-separated magic-link allowlist
 
 # Optional — local dev only (ignored in production):
 DISABLE_AUTH=true                     # bypass magic-link; remove to re-enable auth
+
+# Sentry (optional locally; required on Vercel for source maps):
+NEXT_PUBLIC_SENTRY_DSN=
+SENTRY_DSN=
+SENTRY_AUTH_TOKEN=                    # build-time source map upload
 ```
 
 Chat data uses the service role key server-side. Auth uses the publishable key + cookies via `@supabase/ssr`.
@@ -144,9 +178,13 @@ On first message, `INITIAL_ROSIE_MESSAGE` is shown in UI and sent as `initialMes
 
 ### Auth (`middleware.ts`)
 
-Supabase magic link + `ALLOWED_EMAILS` allowlist. Protects all routes except `/login`, `/auth/callback`, `/api/auth/login`.
+Supabase magic link + `ALLOWED_EMAILS` allowlist. Protects all routes except `/login`, `/auth/callback`, `/api/auth/login`, and Sentry's `/monitoring` tunnel.
 
 `DISABLE_AUTH=true` in `.env.local` bypasses auth in non-production only (for local UI work). Never set in Vercel production env.
+
+### Sentry
+
+`@sentry/nextjs` across client, server, and edge. `lib/sentry-scrub.ts` strips chat/API bodies before events leave the app. Config: `instrumentation-client.ts`, `sentry.server.config.ts`, `sentry.edge.config.ts`, `instrumentation.ts`, `app/global-error.tsx`, `next.config.ts` (`tunnelRoute: "/monitoring"`).
 
 ---
 
@@ -163,6 +201,13 @@ app/
   api/chat/route.ts           Anthropic + tool loop + scoped message saves
   api/wedding-state/route.ts  GET wedding state JSON
   auth/callback/route.ts      magic-link callback
+  global-error.tsx            Sentry root error boundary
+
+instrumentation-client.ts     Sentry browser init
+instrumentation.ts              Sentry server registration
+sentry.server.config.ts         Sentry Node init
+sentry.edge.config.ts           Sentry Edge init
+lib/sentry-scrub.ts             strip chat payloads before Sentry upload
 
 components/
   Nav.tsx                     Home | Ask Rosie | Sign out
@@ -233,6 +278,7 @@ In `ROSIE_BASE_PROMPT` (`lib/system-prompt.ts`); all subject to change as Kelsie
 ## Known issues / things to be aware of
 
 - **Schema migration required** for vendor focuses — run the `thread_key` + `vendor_memory` block in `supabase/schema.sql` if not already applied. Chat POST fails without `thread_key` column.
+- **Vercel preview env vars** — production and development env vars are set; preview (PR) deploys may need the same vars added manually in the Vercel dashboard if you use branch previews.
 - **Returning visits skip the intro** on `/chat` — clear `messages` (main thread only: `thread_key IS NULL`) to replay.
 - **Aesthetic placeholders** exist in seeded `wedding_state` but are not shown on the home UI.
 - **Tool use is sequential** — multiple `update_wedding_data` calls in one turn process one at a time (loop in `route.ts`).
