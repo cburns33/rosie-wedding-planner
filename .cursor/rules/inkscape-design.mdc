@@ -1,0 +1,11 @@
+---
+description: Assume Inkscape for homemade design and SVG asset questions
+alwaysApply: true
+---
+
+# Design tooling
+
+When the user asks about homemade design work — drawing assets, SVG paths, smoothing strokes, fills/strokes, layers, or exporting art for this project — assume they are using **Inkscape only**.
+
+- Give Inkscape menu paths, shortcuts, and tool names (not Figma, Illustrator, etc.) unless they explicitly ask for another app.
+- Export guidance should target SVG copied into `components/` (e.g. `VineDecoration.tsx`), with `viewBox` and path `d` attributes in mind.

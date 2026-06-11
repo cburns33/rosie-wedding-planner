@@ -1,0 +1,239 @@
+# Rosie — Project Summary
+
+A personalized wedding planning AI agent built as an engagement gift from Chase Burns to his sister Kelsie Burns, who is marrying Hank Harris in spring 2027.
+
+---
+
+## Stack
+
+- **Next.js 16** (App Router, TypeScript)
+- **Anthropic API** — `claude-sonnet-4-6`
+- **Supabase** — Postgres + magic-link auth via `@supabase/ssr`
+- **Tailwind CSS v4** — CSS-based theme config (no tailwind.config.ts)
+- **Vercel** — deploy target
+
+---
+
+## Running locally
+
+```bash
+cp .env.local.example .env.local   # fill in values
+npm install
+npm run dev
+```
+
+Sign-in lands on **Planning home** (`/`). **Ask Rosie** is at `/chat`.
+
+---
+
+## Environment variables
+
+```
+ANTHROPIC_API_KEY=
+SUPABASE_URL=                         # base project URL, no /rest/v1 suffix
+NEXT_PUBLIC_SUPABASE_URL=             # same as SUPABASE_URL
+NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY= # anon/public key (legacy: NEXT_PUBLIC_SUPABASE_ANON_KEY)
+SUPABASE_SERVICE_ROLE_KEY=            # server-side DB access for chat API
+ALLOWED_EMAILS=                       # comma-separated magic-link allowlist
+
+# Optional — local dev only (ignored in production):
+DISABLE_AUTH=true                     # bypass magic-link; remove to re-enable auth
+```
+
+Chat data uses the service role key server-side. Auth uses the publishable key + cookies via `@supabase/ssr`.
+
+---
+
+## Routes
+
+| Route | Purpose |
+|-------|---------|
+| `/` | **Planning home** — wedding briefing (weeks-to-go, up next, progress, summary cards, details) |
+| `/chat` | **Ask Rosie** — main conversation (`thread_key = null`) |
+| `/chat/[vendor]` | **Vendor focus** — scoped chat for one of nine vendors (e.g. `/chat/caterer`) |
+| `/dashboard` | Redirects to `/` (legacy bookmark) |
+| `/login` | Magic-link sign-in |
+| `/api/chat` | Chat POST (Anthropic + tools) |
+| `/api/wedding-state` | GET read-only wedding state (for client refetch) |
+
+Nav: **Home** · **Ask Rosie** · Sign out. Rosie wordmark → `/`.
+
+---
+
+## Database (Supabase)
+
+Run `supabase/schema.sql` in the Supabase SQL editor on first setup. If the project predates vendor focuses, also run the migration block at the bottom of that file (`thread_key` + `vendor_memory`).
+
+**`messages`** — conversation history (scoped by thread)
+
+| column | type |
+|--------|------|
+| id | bigserial PK |
+| role | text ('user' \| 'assistant') |
+| content | text |
+| thread_key | text, nullable — `null` = main Ask Rosie thread; vendor key = that focus |
+| created_at | timestamptz |
+
+**`wedding_state`** — single-row structured planning data (id always = 1)
+
+| column | type |
+|--------|------|
+| id | int PK (always 1) |
+| data | jsonb |
+| updated_at | timestamptz |
+
+**`vendor_memory`** — internal per-vendor notes (Rosie-only, never shown in UI)
+
+| column | type |
+|--------|------|
+| vendor | text PK (e.g. `caterer`) |
+| markdown | text |
+| updated_at | timestamptz |
+
+The `wedding_state.data` shape is in `lib/types.ts` (`WeddingState`), seeded in `lib/wedding-defaults.ts`.
+
+---
+
+## Architecture
+
+### Planning home (`/`)
+
+Server-fetches `wedding_state`, renders `PlanningHomeShell` (client wrapper).
+
+- **Briefing** (`PlanningHome.tsx`): hero, up-next card (links to `/chat` or `/chat/[vendor]`), milestone strip, three summary cards, then **The details** (`Dashboard.tsx`).
+- **Live updates**: `PlanningHomeShell` refetches via `GET /api/wedding-state` on tab focus/visibility and on `wedding-state-updated` (dispatched from chat after each reply). No websocket.
+- **Interactivity**: most cards link to chat or vendor focus; hover lift via `.card-interactive` in `globals.css`. Sticky **Ask Rosie** pill on mobile.
+
+Derived UI logic lives in `lib/planning-utils.ts` (`getUpNext`, `getMilestones`, `getSummary`, `weeksToGo`).
+
+### Chat flow (`app/api/chat/route.ts`)
+
+1. Accept `message`, optional `initialMessage`, optional `threadKey` (vendor key or omitted for main thread).
+2. Fetch scoped messages + `wedding_state` (+ vendor memory when in a focus).
+3. Build system prompt via `buildSystemPrompt(state, vendorFocus?)`.
+4. Call Anthropic with thread-appropriate tools (`getTools()`).
+5. Tool loop (up to 3): process tool calls, re-fetch state, second API call.
+6. Save user + assistant messages with matching `thread_key`.
+7. Return `{ message, suggestFocus? }` — `suggestFocus` surfaces a handoff link in general chat.
+
+### Tools
+
+| Tool | Available in | Purpose |
+|------|--------------|---------|
+| `update_wedding_data` | all threads | Structured facts → `wedding_state` (global, always) |
+| `update_vendor_memory` | vendor focus | Rewrite internal templated markdown for that vendor |
+| `note_for_vendor` | vendor focus | Append a note to another vendor's memory |
+| `suggest_vendor_focus` | main chat only | Return `{ vendor, label }` for UI handoff link |
+
+**Principle:** conversations are scoped; facts are global. Kelsie can mention the florist while in the caterer focus and Rosie still writes to `vendors.florist.*`.
+
+### Vendor focuses
+
+- Nine vendors: keys in `lib/vendors.ts` (`VENDOR_KEYS`, labels, `vendorFocusLabel()`).
+- User-facing term: **focus** ("your caterer focus"), not "agent" or "thread".
+- Internal memory template headings in `lib/system-prompt.ts` (`VENDOR_MEMORY_TEMPLATE`).
+- First open of a focus shows a contextual opener (`vendorOpeningMessage()`); not the signature intro.
+
+### First visit vs. returning (main chat only)
+
+`app/chat/page.tsx` loads messages where `thread_key IS NULL`. Intro shows only when `shouldShowIntro()` is true (`lib/intro.ts`: not `intro_completed`, no prior messages).
+
+The signature intro (`IntroScreen`) lives on `/chat` only. Planning home (`/`) is always the briefing; Kelsie taps **Ask Rosie** when ready.
+
+On first message, `INITIAL_ROSIE_MESSAGE` is shown in UI and sent as `initialMessage` in the first POST so the API prepends it before Kelsie's turn. Sets `intro_completed` on `wedding_state`.
+
+### Auth (`middleware.ts`)
+
+Supabase magic link + `ALLOWED_EMAILS` allowlist. Protects all routes except `/login`, `/auth/callback`, `/api/auth/login`.
+
+`DISABLE_AUTH=true` in `.env.local` bypasses auth in non-production only (for local UI work). Never set in Vercel production env.
+
+---
+
+## File map
+
+```
+app/
+  layout.tsx                  fonts + metadata
+  globals.css                 theme, intro/briefing animations, .card-interactive
+  page.tsx                    planning home (server → PlanningHomeShell)
+  chat/page.tsx               main Ask Rosie chat
+  chat/[vendor]/page.tsx      vendor focus chat
+  dashboard/page.tsx          redirect → /
+  api/chat/route.ts           Anthropic + tool loop + scoped message saves
+  api/wedding-state/route.ts  GET wedding state JSON
+  auth/callback/route.ts      magic-link callback
+
+components/
+  Nav.tsx                     Home | Ask Rosie | Sign out
+  PlanningHome.tsx            briefing layout (hero, up next, progress, summaries)
+  PlanningHomeShell.tsx       client refetch wrapper
+  Dashboard.tsx               budget, venue, vendors, decisions (interactive cards)
+  ChatPageShell.tsx           nav + ChatInterface wrapper
+  ChatInterface.tsx           messages, intro, vendor header, suggestFocus link
+  IntroScreen.tsx             signature intro (main chat first visit)
+  MessageBubble.tsx, ChatInput.tsx, RosieSignature.tsx, VineDecoration.tsx
+
+lib/
+  types.ts                    WeddingState, Message (+ thread_key), VendorMemory
+  vendors.ts                  VENDOR_KEYS, labels, isVendorKey, vendorFocusLabel
+  planning-utils.ts           weeksToGo, getUpNext, getMilestones, getSummary
+  system-prompt.ts            ROSIE_BASE_PROMPT, buildSystemPrompt, getTools, memory template
+  wedding-defaults.ts         DEFAULT_WEDDING_STATE
+  intro.ts                    shouldShowIntro()
+  deep-set.ts, supabase.ts, auth.ts, supabase-env.ts
+
+prd/
+  vendor-chats.md             spec for vendor focuses (implemented)
+
+supabase/
+  schema.sql                  tables + seed + vendor migration block
+```
+
+---
+
+## Design system
+
+**Fonts**
+- `font-script` — Great Vibes (signature/title only)
+- `font-serif` — Cormorant Garamond (decorative headings)
+- `font-sans` — Inter (body, default)
+
+**Colors** (`@theme` in globals.css)
+- `cream`, `warm-dark`, `warm-mid`, `warm-light`, `border`
+- `blush` / `blush-light` / `blush-pale` — primary accent
+- `sage` / `sage-light` — green (contacted, done)
+- `mist` / `mist-light` — blue (considering)
+
+**UX references (vibe, don't clone)**
+- Structure: Withjoy/Zola phased progress
+- Clarity: Linear hierarchy and whitespace
+- Warmth: Airbnb-style scannable cards
+- Aesthetic: editorial wedding / serif + whitespace
+- Avoid: Asana, Monday, Notion databases, generic admin dashboards
+
+**Hidden for now:** Aesthetic section in `Dashboard.tsx` (placeholders; Kelsie decides palette/style/music via Rosie).
+
+---
+
+## Rosie's pre-loaded context
+
+In `ROSIE_BASE_PROMPT` (`lib/system-prompt.ts`); all subject to change as Kelsie updates:
+
+- Budget: $75,000 · Guests: 250–300 · Date: spring 2027
+- Location: southeast/central Texas, Houston hub
+- Aesthetic: elevated classic · Palette: pink, green, blue
+- Music: DJ + possible live instrument (no full band)
+- Decision style: 3 options at a time, one question at a time
+- Fiancé: Hank Harris (always "Hank")
+- Gift from: Chase Burns (brother)
+
+---
+
+## Known issues / things to be aware of
+
+- **Schema migration required** for vendor focuses — run the `thread_key` + `vendor_memory` block in `supabase/schema.sql` if not already applied. Chat POST fails without `thread_key` column.
+- **Returning visits skip the intro** on `/chat` — clear `messages` (main thread only: `thread_key IS NULL`) to replay.
+- **Aesthetic placeholders** exist in seeded `wedding_state` but are not shown on the home UI.
+- **Tool use is sequential** — multiple `update_wedding_data` calls in one turn process one at a time (loop in `route.ts`).
+- **`/dashboard`** redirects to `/`; update any bookmarks.

@@ -1,0 +1,48 @@
+"use client";
+
+import { useState } from "react";
+import Nav from "@/components/Nav";
+import ChatInterface from "@/components/ChatInterface";
+import type { Message } from "@/lib/types";
+
+interface VendorFocus {
+  key: string;
+  label: string;
+  status: string;
+}
+
+interface ChatPageShellProps {
+  initialMessages: Message[];
+  showIntro: boolean;
+  threadKey?: string | null;
+  vendorFocus?: VendorFocus;
+  openingMessage?: string;
+}
+
+export default function ChatPageShell({
+  initialMessages,
+  showIntro,
+  threadKey = null,
+  vendorFocus,
+  openingMessage,
+}: ChatPageShellProps) {
+  const [showNav, setShowNav] = useState(!showIntro);
+
+  return (
+    <div className="flex flex-col h-full">
+      {showNav && <Nav />}
+      <main
+        className={`flex-1 flex flex-col overflow-hidden ${showNav ? "pt-16" : ""}`}
+      >
+        <ChatInterface
+          initialMessages={initialMessages}
+          showIntro={showIntro}
+          onIntroDismiss={() => setShowNav(true)}
+          threadKey={threadKey}
+          vendorFocus={vendorFocus}
+          openingMessage={openingMessage}
+        />
+      </main>
+    </div>
+  );
+}
