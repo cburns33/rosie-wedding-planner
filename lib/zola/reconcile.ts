@@ -3,11 +3,16 @@ import { DEFAULT_WEDDING_STATE } from "@/lib/wedding-defaults";
 import type { WeddingState, ZolaSnapshot } from "@/lib/types";
 
 async function getWeddingData(): Promise<WeddingState> {
-  const { data } = await getSupabase()
+  const { data, error } = await getSupabase()
     .from("wedding_state")
     .select("data")
     .eq("id", 1)
     .single();
+  // Surface read failures instead of silently falling back to defaults — a
+  // swallowed error here would let a later upsert overwrite real state.
+  if (error) {
+    throw new Error(`wedding_state read failed: ${error.message}`);
+  }
   return { ...DEFAULT_WEDDING_STATE, ...(data?.data as Partial<WeddingState>) };
 }
 
@@ -63,7 +68,13 @@ export async function reconcileWeddingState(
     },
   };
 
-  await getSupabase()
+  const { error } = await getSupabase()
     .from("wedding_state")
     .upsert({ id: 1, data: updated, updated_at: now });
+  // supabase-js returns errors in the response rather than throwing. Without
+  // this check a rejected write (e.g. RLS denial) fails silently — the RSVP
+  // counts never land and no Sentry alert fires.
+  if (error) {
+    throw new Error(`wedding_state upsert failed: ${error.message}`);
+  }
 }

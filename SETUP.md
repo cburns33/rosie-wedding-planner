@@ -11,9 +11,10 @@ This guide covers first-time setup and where things live. Day-to-day, you mostly
 
 1. Create a new project at [supabase.com](https://supabase.com)
 2. Go to **SQL Editor** and run the contents of `supabase/schema.sql`
-3. **Existing projects:** re-run only the migration blocks you are missing from `schema.sql`:
-   - **Vendor focuses** (bottom of file): `messages.thread_key` + `vendor_memory` table. Chat will error until this is applied.
-   - **Zola integration** (top of file): `zola_snapshots` table **and** the `GRANT` / `REVOKE` lines for `service_role`. Creating the table alone is not enough — without grants, sync auth succeeds but inserts fail with permission denied.
+3. **Existing projects:** re-run only the migration blocks you are missing from `schema.sql`. **Run each block in full, including its `GRANT` / `REVOKE` lines.** Every table here is RLS-protected and reachable only via the `service_role` key; creating a table without its grants leaves server-side reads/writes failing with `permission denied`, and the failure can be silent.
+   - **Core tables + grants** (bottom of file): the `GRANT SELECT, INSERT, UPDATE, DELETE ON public.wedding_state` and `... ON public.messages TO service_role` lines. Missing these means RSVP reconcile never lands in `wedding_state` and chat history never saves (this bit the live DB; fixed via a migration on 2026-06-12).
+   - **Vendor focuses** (bottom of file): `messages.thread_key` + `vendor_memory` table. Chat will error without the `thread_key` column.
+   - **Zola integration** (top of file): `zola_snapshots` table **and** its `service_role` grants. With the table but no grants, sync auth succeeds but inserts fail with permission denied.
 4. Grab credentials from **Settings → API**:
    - Project URL → `SUPABASE_URL` and `NEXT_PUBLIC_SUPABASE_URL` (base URL only, no `/rest/v1` suffix)
    - `anon` `public` key → `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` (or `NEXT_PUBLIC_SUPABASE_ANON_KEY`)
@@ -37,6 +38,8 @@ npm run dev
 ```
 
 Open [http://localhost:3000](http://localhost:3000) — you should land on **Planning home** after sign-in.
+
+Run the unit tests with `npm test` (Vitest; `npm run test:watch` for watch mode). Coverage lives next to the code it tests, e.g. `lib/zola/*.test.ts`.
 
 ### Optional: skip auth locally
 

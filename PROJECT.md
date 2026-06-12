@@ -145,6 +145,24 @@ Latest snapshot = most recent `imported_at`. See the Zola integration section be
 
 The `wedding_state.data` shape is in `lib/types.ts` (`WeddingState`), seeded in `lib/wedding-defaults.ts`.
 
+> **`service_role` grants matter.** `wedding_state`, `messages`, `vendor_memory`, and `zola_snapshots` are RLS-protected and reachable only via the server-side `service_role` key. Creating a table is not enough; the matching `GRANT … TO service_role` lines in `schema.sql` must also run. Without them, reads/writes fail with `permission denied`. See `SETUP.md` §1.
+
+---
+
+## Testing
+
+Unit tests run on **Vitest** (`vitest.config.ts`, Node environment, tsconfig path aliases resolved natively).
+
+```bash
+npm test          # run once
+npm run test:watch
+```
+
+Coverage focuses on the pure, regression-prone Zola logic:
+
+- `lib/zola/normalize.test.ts` — headline-event selection, the meal-count guard (never fabricates a zero-count choice from menu-only data), null-registry omission, thank-you-pending detection, budget cents-to-dollars, and the public `toAggregates` shape (staleness + PII-free).
+- `lib/zola/reconcile.test.ts` — RSVP write-through into `wedding_state.guests`, the `>10%` invited-count `decisions[]` threshold edges (exactly 10% does not log; null/zero previous; drop-to-zero), and that a rejected Supabase read/write throws rather than failing silently (mocked client).
+
 ---
 
 ## Architecture
@@ -212,7 +230,7 @@ Supabase magic link + `ALLOWED_EMAILS` allowlist. Protects all routes except `/l
 Rosie pulls live RSVP + registry aggregates from the couple's Zola account so the home card and chat answers are grounded in reality. Kelsie configures nothing; Chase sets `ZOLA_REFRESH_TOKEN`, `ZOLA_PROFILE_URL`, and `CRON_SECRET` (see `SETUP.md`).
 
 - **Client** (`lib/zola/client.ts`): adapts the MIT [zola-mcp](https://github.com/chrischall/zola-mcp) auth flow — the `usr` cookie JWT refreshes a short-lived session token against `mobile-api.zola.com`. Read-only; no write tools.
-- **Sync** (`lib/zola/sync.ts`): cron (once daily at noon UTC via `vercel.json`; Vercel Hobby limit) → fetch RSVPs/events, gift tracker (skipped if account has no registry yet), budget → `normalize.ts` → insert `zola_snapshots` row → `reconcile.ts` writes RSVP counts into `wedding_state.guests` (logs a `decisions[]` entry only on a >10% invited-count change).
+- **Sync** (`lib/zola/sync.ts`): cron (once daily at noon UTC via `vercel.json`; Vercel Hobby limit) → fetch RSVPs/events, gift tracker (skipped if account has no registry yet), budget → `normalize.ts` → insert `zola_snapshots` row → `reconcile.ts` writes RSVP counts into `wedding_state.guests` (logs a `decisions[]` entry only on a >10% invited-count change). Reconcile throws if the `wedding_state` read or write is rejected, so a failure surfaces to Sentry instead of silently dropping the reconcile.
 - **Headline event**: an account can have several events (wedding, rehearsal, etc.). The summary shown on the home card and in chat comes from one "headline" event. The API path picks it by event `type` (`wedding`/`reception`/`ceremony`), falling back to the largest headcount. Meal aggregates come from that headline event (catering-relevant), with a fallback to whichever event actually collected meal choices.
 - **Surfacing**: home card `ZolaGuestsCard.tsx` (hidden until a snapshot exists), refetched by `PlanningHomeShell` on focus and the `zola-snapshot-updated` event. Chat injects an aggregate block into the system prompt and exposes the `get_zola_summary` tool. Meal choices are only added to the caterer focus.
 - **Privacy**: snapshots and API responses are aggregates only — no guest names/addresses. `lib/sentry-scrub.ts` strips integration payloads and tokens. Open-text custom questions (e.g. dietary notes) are intentionally not captured.
@@ -266,11 +284,15 @@ lib/
   zola/                       Zola integration (read-only)
     client.ts                 mobile API auth + read-only fetch
     normalize.ts              raw API/CSV → ZolaSnapshot + public aggregates
+    normalize.test.ts         normalizer + toAggregates unit tests (Vitest)
     sync.ts                   orchestrate fetch → snapshot → reconcile
     reconcile.ts              fold RSVP aggregates into wedding_state
+    reconcile.test.ts         reconcile write-through + threshold unit tests
     store.ts                  zola_snapshots read/write + profile URL
     parse-csv.ts              CSV fallback parser (Chase only)
     cron-auth.ts              CRON_SECRET bearer check
+
+vitest.config.ts              Vitest config (Node env, tsconfig path aliases)
 
 prd/
   vendor-chats.md             spec for vendor focuses (implemented)
@@ -322,6 +344,7 @@ In `ROSIE_BASE_PROMPT` (`lib/system-prompt.ts`); all subject to change as Kelsie
 ## Known issues / things to be aware of
 
 - **Schema migration required** for vendor focuses — run the `thread_key` + `vendor_memory` block in `supabase/schema.sql` if not already applied. Chat POST fails without `thread_key` column.
+- **`service_role` grants are easy to miss.** Applying `schema.sql` partially (tables without the `GRANT … TO service_role` lines) leaves server-side reads/writes failing with `permission denied`. Because the app historically did not check the Supabase error, this failed silently: RSVP reconcile never landed in `wedding_state` and chat history never saved. A live-DB migration on 2026-06-12 (`grant_service_role_dml_on_wedding_state_and_messages`) restored the missing grants on `wedding_state` + `messages`; reconcile now throws on a rejected write so it can never fail silently again.
 - **Vercel preview env vars** — production and development env vars are set; preview (PR) deploys may need the same vars added manually in the Vercel dashboard if you use branch previews.
 - **Returning visits skip the intro** on `/chat` — clear `messages` (main thread only: `thread_key IS NULL`) to replay.
 - **Aesthetic placeholders** exist in seeded `wedding_state` but are not shown on the home UI.
