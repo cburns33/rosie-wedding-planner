@@ -98,6 +98,15 @@ export interface ZolaSnapshot {
   syncedAt: string;
 }
 
+/** Ephemeral vendor email draft returned on the chat API response (not stored in DB). */
+export interface EmailDraft {
+  vendor: string;
+  to: string;
+  toName: string | null;
+  subject: string;
+  body: string;
+}
+
 export interface Message {
   id: number;
   role: "user" | "assistant";

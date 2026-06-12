@@ -185,13 +185,14 @@ Derived UI logic lives in `lib/planning-utils.ts` (`getUpNext`, `getMilestones`,
 4. Call Anthropic with thread-appropriate tools (`getTools()`).
 5. Tool loop (up to 3): process tool calls, re-fetch state, second API call.
 6. Save user + assistant messages with matching `thread_key`.
-7. Return `{ message, suggestFocus? }` — `suggestFocus` surfaces a handoff link in general chat.
+7. Return `{ message, suggestFocus?, emailDraft? }` — `suggestFocus` surfaces a handoff link in general chat; `emailDraft` surfaces an inline vendor email draft card (ephemeral, not stored in `messages`).
 
 ### Tools
 
 | Tool | Available in | Purpose |
 |------|--------------|---------|
 | `update_wedding_data` | all threads | Structured facts → `wedding_state` (global, always) |
+| `draft_vendor_email` | all threads | Prepare outreach email for Kelsie to copy or open in her mail app |
 | `update_vendor_memory` | vendor focus | Rewrite internal templated markdown for that vendor |
 | `note_for_vendor` | vendor focus | Append a note to another vendor's memory |
 | `suggest_vendor_focus` | main chat only | Return `{ vendor, label }` for UI handoff link |
@@ -205,13 +206,11 @@ Derived UI logic lives in `lib/planning-utils.ts` (`getUpNext`, `getMilestones`,
 - Internal memory template headings in `lib/system-prompt.ts` (`VENDOR_MEMORY_TEMPLATE`).
 - First open of a focus shows a contextual opener (`vendorOpeningMessage()`); not the signature intro.
 
-### First visit vs. returning (main chat only)
+### First visit vs. returning
 
-`app/chat/page.tsx` loads messages where `thread_key IS NULL`. Intro shows only when `shouldShowIntro()` is true (`lib/intro.ts`: not `intro_completed`, no prior messages).
+`lib/intro.ts` (`shouldShowWelcome()`): home shows `WelcomeOverlay` when `intro_completed` is false. Dismiss sets the flag via `POST /api/wedding-state/complete-intro` and scrolls to Up next.
 
-The signature intro (`IntroScreen`) lives on `/chat` only. Planning home (`/`) is always the briefing; Kelsie taps **Ask Rosie** when ready.
-
-On first message, `INITIAL_ROSIE_MESSAGE` is shown in UI and sent as `initialMessage` in the first POST so the API prepends it before Kelsie's turn. Sets `intro_completed` on `wedding_state`.
+`/chat` is a normal chat from the first visit (nav always visible, no gated intro). Vendor focuses still use `vendorOpeningMessage()` on first open.
 
 ### Auth (`middleware.ts`)
 
@@ -249,6 +248,7 @@ app/
   dashboard/page.tsx          redirect → /
   api/chat/route.ts           Anthropic + tool loop + scoped message saves
   api/wedding-state/route.ts  GET wedding state JSON
+  api/wedding-state/complete-intro/route.ts  POST mark intro_completed
   api/integrations/zola/route.ts        GET Zola aggregates for home card
   api/integrations/zola/sync/route.ts   POST manual Zola sync (CRON_SECRET)
   api/integrations/zola/import/route.ts POST CSV fallback (CRON_SECRET)
@@ -265,13 +265,14 @@ lib/sentry-scrub.ts             strip chat payloads before Sentry upload
 components/
   Nav.tsx                     Home | Ask Rosie | Sign out
   PlanningHome.tsx            briefing layout (hero, up next, progress, summaries)
-  PlanningHomeShell.tsx       client refetch wrapper
+  PlanningHomeShell.tsx       client refetch wrapper + welcome overlay
+  WelcomeOverlay.tsx          first-visit home onboarding card
   Dashboard.tsx               budget, venue, vendors, decisions (interactive cards)
   ZolaGuestsCard.tsx          Zola-powered RSVP + registry home card
   ChatPageShell.tsx           nav + ChatInterface wrapper
-  ChatInterface.tsx           messages, intro, vendor header, suggestFocus link
-  IntroScreen.tsx             signature intro (main chat first visit)
-  MessageBubble.tsx, ChatInput.tsx, RosieSignature.tsx, VineDecoration.tsx
+  ChatInterface.tsx           messages, vendor header, suggestFocus + emailDraft cards
+  VendorEmailDraftCard.tsx    inline vendor email draft (Copy / Open in email)
+  MessageBubble.tsx, ChatInput.tsx
 
 lib/
   types.ts                    WeddingState, Message (+ thread_key), VendorMemory
@@ -279,7 +280,9 @@ lib/
   planning-utils.ts           weeksToGo, getUpNext, getMilestones, getSummary
   system-prompt.ts            ROSIE_BASE_PROMPT, buildSystemPrompt, getTools, memory template
   wedding-defaults.ts         DEFAULT_WEDDING_STATE
-  intro.ts                    shouldShowIntro()
+  intro.ts                    shouldShowWelcome()
+  vendor-email.ts             mailto URL builder, length guard, clipboard helper
+  vendor-email.test.ts        unit tests for mailto encoding + length guard
   deep-set.ts, supabase.ts, auth.ts, supabase-env.ts
   zola/                       Zola integration (read-only)
     client.ts                 mobile API auth + read-only fetch

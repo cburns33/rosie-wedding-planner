@@ -57,7 +57,6 @@ export default async function VendorChatPage({
   return (
     <ChatPageShell
       initialMessages={messages}
-      showIntro={false}
       threadKey={vendor}
       vendorFocus={{
         key: vendor,

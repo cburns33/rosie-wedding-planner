@@ -107,7 +107,25 @@ Vendor fields you can track:
 - \`vendors.<name>.booked_cost\` — what was actually agreed/signed
 - \`vendors.<name>.status\` — undecided | considering | contacted | booked
 
-When Kelsie mentions a vendor contact name, email, or phone number, capture it. When a quote is discussed, save it as \`quoted_cost\`. When something is booked and a final number is agreed, save that as \`booked_cost\`.`;
+When Kelsie mentions a vendor contact name, email, or phone number, capture it. When a quote is discussed, save it as \`quoted_cost\`. When something is booked and a final number is agreed, save that as \`booked_cost\`.
+
+**Vendor outreach (draft only)**
+
+When Kelsie wants to email a vendor, draft the email with \`draft_vendor_email\`. You prepare text; she sends it from her own inbox. Never claim you sent anything. Never offer to send on her behalf.
+
+Email tone: professional, warm, concise. Plain text. Sign as Kelsie (not Rosie). Include what's relevant: spring 2027, ~250–300 guests, southeast/central Texas / Houston area, elevated classic aesthetic — only what fits the ask.
+
+Typical structure:
+- Brief intro (who she is, wedding date window)
+- Specific ask (availability, pricing, portfolio review, follow-up on quote)
+- One or two relevant details (guest count, venue area if known)
+- Warm close + sign-off as Kelsie
+
+If \`vendors.<name>.contact.email\` is missing, ask for it once, save via \`update_wedding_data\`, then draft. If she hasn't picked a specific business yet, help her choose first — don't draft to a placeholder.
+
+After she confirms she sent an email, you may update \`vendors.<name>.status\` to \`contacted\` if appropriate.
+
+When you call \`draft_vendor_email\`, keep your chat reply short — introduce the draft in one or two lines and point her to the card. Do not repeat the full email body in the chat bubble.`;
 
 /** Internal memory scaffold for a vendor focus — never shown to Kelsie. */
 export const VENDOR_MEMORY_TEMPLATE = `## Status
@@ -123,7 +141,10 @@ What Kelsie wants for this vendor; aesthetic ties; constraints.
 Bullets: what we still need from her or from vendors.
 
 ## Next step
-Single sentence to resume this focus.`;
+Single sentence to resume this focus.
+
+## Outreach
+Bullets: date, recipient, purpose (inquiry / follow-up), subject line — drafts prepared for Kelsie to send herself. Not a sent log unless she confirms she sent it.`;
 
 export interface VendorFocusContext {
   key: string;
@@ -160,7 +181,7 @@ ${stateBlock}${zolaBlock}`;
 
 **You are in ${vendorFocus.label} focus**
 
-This conversation is dedicated to the ${vendorFocus.label.replace(/^your /, "")}. Stay focused here. Greet and continue in context using the state and your running memory below.
+This conversation is dedicated to the ${vendorFocus.label.replace(/^your /, "")}. Stay focused here. Greet and continue in context using the state and your running memory below. This focus is the natural place to draft outreach emails for this vendor.
 
 Cross-talk: if Kelsie brings up a different vendor, still capture real facts to the global wedding state via \`update_wedding_data\` (they land in the right slot regardless of which focus you're in). For a stray aside worth remembering elsewhere, call \`note_for_vendor\` to drop a short note into that other vendor's memory. If she clearly wants to shift the whole conversation to a different vendor, offer warmly to pick it up in that focus instead.
 
@@ -273,6 +294,47 @@ const UPDATE_VENDOR_MEMORY_TOOL = {
   },
 };
 
+const DRAFT_VENDOR_EMAIL_TOOL = {
+  name: "draft_vendor_email",
+  description:
+    "Prepare a vendor outreach email for Kelsie to send herself. Call when she asks for a draft, inquiry, or follow-up email. Do not call for general advice about emailing — only when producing an actual draft.",
+  input_schema: {
+    type: "object" as const,
+    properties: {
+      vendor: {
+        type: "string",
+        enum: [...VENDOR_KEYS],
+        description: "Vendor category key.",
+      },
+      to_email: {
+        type: "string",
+        description:
+          "Recipient email. Omit to use vendors.<vendor>.contact.email from state.",
+      },
+      to_name: {
+        type: "string",
+        description:
+          "Recipient name for greeting. Omit to use contact.name or vendor business name.",
+      },
+      subject: {
+        type: "string",
+        description: "Email subject line.",
+      },
+      body: {
+        type: "string",
+        description:
+          "Full email body. Sign as Kelsie. Professional-warm tone. Plain text only, no markdown.",
+      },
+      purpose: {
+        type: "string",
+        enum: ["inquiry", "follow_up", "hold_date", "other"],
+        description: "Internal tag for memory logging.",
+      },
+    },
+    required: ["vendor", "subject", "body", "purpose"],
+  },
+};
+
 const GET_ZOLA_SUMMARY_TOOL = {
   name: "get_zola_summary",
   description:
@@ -288,16 +350,19 @@ export function getTools(vendorKey?: string | null) {
   if (vendorKey) {
     return [
       ...WEDDING_TOOLS,
+      DRAFT_VENDOR_EMAIL_TOOL,
       NOTE_FOR_VENDOR_TOOL,
       UPDATE_VENDOR_MEMORY_TOOL,
       GET_ZOLA_SUMMARY_TOOL,
     ];
   }
-  return [...WEDDING_TOOLS, SUGGEST_VENDOR_FOCUS_TOOL, GET_ZOLA_SUMMARY_TOOL];
+  return [
+    ...WEDDING_TOOLS,
+    DRAFT_VENDOR_EMAIL_TOOL,
+    SUGGEST_VENDOR_FOCUS_TOOL,
+    GET_ZOLA_SUMMARY_TOOL,
+  ];
 }
-
-export const INITIAL_ROSIE_MESSAGE =
-  "Congratulations. Take a breath — you just got engaged. Before spreadsheets and venues and all the rest of it, I want to ask you something. Close your eyes. What's the first thing you see when you picture your wedding day?";
 
 /** Opening assistant line shown when a vendor focus is opened for the first time. */
 export function vendorOpeningMessage(label: string): string {

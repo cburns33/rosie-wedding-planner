@@ -3,6 +3,8 @@
 import { useState, useEffect, useCallback } from "react";
 import Nav from "./Nav";
 import PlanningHome from "./PlanningHome";
+import WelcomeOverlay from "./WelcomeOverlay";
+import { shouldShowWelcome } from "@/lib/intro";
 import type { WeddingState } from "@/lib/types";
 import type { ZolaAggregates } from "@/lib/zola/normalize";
 
@@ -22,6 +24,8 @@ export default function PlanningHomeShell({
 }: PlanningHomeShellProps) {
   const [data, setData] = useState(initialData);
   const [zola, setZola] = useState<ZolaAggregates | null>(initialZola);
+  const [showWelcome, setShowWelcome] = useState(shouldShowWelcome(initialData));
+  const [dismissingWelcome, setDismissingWelcome] = useState(false);
 
   const refetch = useCallback(async () => {
     try {
@@ -64,12 +68,38 @@ export default function PlanningHomeShell({
     };
   }, [refetch, refetchZola]);
 
+  async function handleWelcomeDismiss() {
+    if (dismissingWelcome) return;
+    setDismissingWelcome(true);
+
+    try {
+      await fetch("/api/wedding-state/complete-intro", { method: "POST" });
+      setData((prev) => ({ ...prev, intro_completed: true }));
+      window.dispatchEvent(new Event("wedding-state-updated"));
+    } catch {
+      setDismissingWelcome(false);
+      return;
+    }
+
+    window.setTimeout(() => {
+      setShowWelcome(false);
+      setDismissingWelcome(false);
+      document.getElementById("up-next")?.scrollIntoView({
+        behavior: "smooth",
+        block: "center",
+      });
+    }, 300);
+  }
+
   return (
     <div className="flex flex-col min-h-full">
       <Nav />
       <main className="flex-1 pt-16 overflow-y-auto">
         <PlanningHome data={data} zola={zola} />
       </main>
+      {showWelcome && (
+        <WelcomeOverlay onDismiss={handleWelcomeDismiss} dismissing={dismissingWelcome} />
+      )}
     </div>
   );
 }

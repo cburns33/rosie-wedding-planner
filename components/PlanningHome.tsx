@@ -78,7 +78,8 @@ export default function PlanningHome({ data, zola }: PlanningHomeProps) {
 
         {/* Up next — entire card is the action */}
         <section
-          className="briefing-item space-y-3"
+          id="up-next"
+          className="briefing-item space-y-3 scroll-mt-24"
           style={{ animationDelay: "100ms" }}
         >
           <h2 className="text-xs tracking-[0.2em] uppercase text-warm-light">

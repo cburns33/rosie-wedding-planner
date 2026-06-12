@@ -17,7 +17,7 @@ import {
   vendorFocusLabel,
   type VendorKey,
 } from "@/lib/vendors";
-import type { WeddingState, Message } from "@/lib/types";
+import type { WeddingState, Message, EmailDraft } from "@/lib/types";
 
 const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
 
@@ -99,19 +99,6 @@ async function applyWeddingDataUpdate(
     .upsert({ id: 1, data: updated, updated_at: new Date().toISOString() });
 }
 
-async function markIntroCompleted(): Promise<void> {
-  const current = await getWeddingData();
-  if (current.intro_completed) return;
-
-  await getSupabase()
-    .from("wedding_state")
-    .upsert({
-      id: 1,
-      data: { ...current, intro_completed: true },
-      updated_at: new Date().toISOString(),
-    });
-}
-
 async function buildVendorFocus(
   vendor: VendorKey
 ): Promise<VendorFocusContext> {
@@ -129,10 +116,6 @@ export async function POST(req: Request) {
     typeof rawThreadKey === "string" && isVendorKey(rawThreadKey)
       ? rawThreadKey
       : null;
-
-  if (initialMessage && !threadKey) {
-    await markIntroCompleted();
-  }
 
   const [dbMessages, weddingData, storedZola, zolaProfileUrl] = await Promise.all([
     getMessages(threadKey),
@@ -173,6 +156,7 @@ export async function POST(req: Request) {
   let assistantContentBlocks = response.content;
   let loopCount = 0;
   let suggestFocus: { vendor: VendorKey; label: string } | null = null;
+  let emailDraft: EmailDraft | null = null;
 
   while (response.stop_reason === "tool_use" && loopCount < 3) {
     const toolUseBlocks = response.content.filter(
@@ -234,6 +218,56 @@ export async function POST(req: Request) {
         } else {
           result = "Unknown vendor.";
         }
+      } else if (block.name === "draft_vendor_email") {
+        const input = block.input as {
+          vendor: string;
+          to_email?: string;
+          to_name?: string;
+          subject: string;
+          body: string;
+          purpose: "inquiry" | "follow_up" | "hold_date" | "other";
+        };
+
+        if (!isVendorKey(input.vendor)) {
+          result = "Unknown vendor.";
+        } else {
+          const currentData = await getWeddingData();
+          const vendorEntry = currentData.vendors[input.vendor];
+          const toEmail =
+            input.to_email?.trim() ||
+            vendorEntry?.contact?.email?.trim() ||
+            null;
+
+          if (!toEmail) {
+            result =
+              "No email on file for this vendor — ask Kelsie for the contact email and save it before drafting.";
+          } else {
+            const toName =
+              input.to_name?.trim() ||
+              vendorEntry?.contact?.name?.trim() ||
+              vendorEntry?.name?.trim() ||
+              null;
+
+            emailDraft = {
+              vendor: input.vendor,
+              to: toEmail,
+              toName,
+              subject: input.subject,
+              body: input.body,
+            };
+
+            const purposeLabel =
+              input.purpose === "follow_up"
+                ? "follow-up"
+                : input.purpose === "hold_date"
+                  ? "hold-date"
+                  : input.purpose;
+            const outreachNote = `Draft ${purposeLabel} email to ${toEmail} — subject: "${input.subject}"`;
+            await appendVendorNote(input.vendor, outreachNote, "Outreach");
+
+            result = "Draft ready for Kelsie.";
+          }
+        }
       }
 
       toolResults.push({
@@ -277,5 +311,5 @@ export async function POST(req: Request) {
   await saveMessage("user", message, threadKey);
   await saveMessage("assistant", assistantText, threadKey);
 
-  return NextResponse.json({ message: assistantText, suggestFocus });
+  return NextResponse.json({ message: assistantText, suggestFocus, emailDraft });
 }

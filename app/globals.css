@@ -68,35 +68,6 @@ body {
   border-radius: 3px;
 }
 
-/* Intro animations */
-@keyframes drawStroke {
-  to { stroke-dashoffset: 0; }
-}
-
-@keyframes fillIn {
-  to { opacity: 1; }
-}
-
-@keyframes revealText {
-  0%   { opacity: 0; filter: blur(6px); transform: translateY(12px); }
-  100% { opacity: 1; filter: blur(0);   transform: translateY(0); }
-}
-
-@keyframes fadeUp {
-  0%   { opacity: 0; transform: translateY(8px); }
-  100% { opacity: 1; transform: translateY(0); }
-}
-
-.rosie-sentence {
-  opacity: 0;
-  animation: revealText 0.8s cubic-bezier(0.25, 0.46, 0.45, 0.94) forwards;
-}
-
-.rosie-input-reveal {
-  opacity: 0;
-  animation: fadeUp 0.6s ease forwards;
-}
-
 /* Planning home — split + staggered entrance. Each section sets its own delay. */
 @keyframes briefingIn {
   0%   { opacity: 0; transform: translateY(12px); filter: blur(4px); }
