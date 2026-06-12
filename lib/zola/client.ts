@@ -16,7 +16,7 @@ const USER_AGENT = "Zola/42.5.0 (iPad; iOS 26.4; Scale/2.0)";
 export interface ZolaContext {
   weddingAccountId: number;
   weddingId: number;
-  registryId: string;
+  registryId: string | null;
   weddingDate: string | null;
   weddingSlug: string | null;
 }
@@ -73,14 +73,14 @@ export class ZolaClient {
       data: {
         wedding_account: { wedding_account_id: number };
         wedding: { wedding_id: number; wedding_date: string | null; slug: string | null };
-        registry: { id: string };
+        registry: { id: string } | null;
       };
     }>("/v3/users/me/context");
 
     this.cachedContext = {
       weddingAccountId: res.data.wedding_account.wedding_account_id,
       weddingId: res.data.wedding.wedding_id,
-      registryId: res.data.registry.id,
+      registryId: res.data.registry?.id ?? null,
       weddingDate: res.data.wedding.wedding_date,
       weddingSlug: res.data.wedding.slug,
     };

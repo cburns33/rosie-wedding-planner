@@ -14,7 +14,11 @@ CREATE TABLE IF NOT EXISTS zola_snapshots (
 );
 CREATE INDEX IF NOT EXISTS zola_snapshots_imported_at_idx
   ON zola_snapshots (imported_at DESC);
-ALTER TABLE zola_snapshots DISABLE ROW LEVEL SECURITY;
+ALTER TABLE zola_snapshots ENABLE ROW LEVEL SECURITY;
+REVOKE ALL ON public.zola_snapshots FROM anon, authenticated;
+GRANT SELECT, INSERT, UPDATE, DELETE ON public.zola_snapshots TO service_role;
+GRANT USAGE, SELECT ON SEQUENCE zola_snapshots_id_seq TO service_role;
+REVOKE ALL ON SEQUENCE zola_snapshots_id_seq FROM anon, authenticated;
 
 -- Conversation history
 CREATE TABLE IF NOT EXISTS messages (
@@ -36,7 +40,9 @@ CREATE TABLE IF NOT EXISTS vendor_memory (
   markdown text NOT NULL DEFAULT '',
   updated_at timestamptz DEFAULT now()
 );
-ALTER TABLE vendor_memory DISABLE ROW LEVEL SECURITY;
+ALTER TABLE vendor_memory ENABLE ROW LEVEL SECURITY;
+REVOKE ALL ON public.vendor_memory FROM anon, authenticated;
+GRANT SELECT, INSERT, UPDATE, DELETE ON public.vendor_memory TO service_role;
 
 -- Wedding planning state (single row, id always = 1)
 CREATE TABLE IF NOT EXISTS wedding_state (
@@ -94,7 +100,11 @@ VALUES (1, '{
 }'::jsonb)
 ON CONFLICT (id) DO NOTHING;
 
--- Optional: disable RLS since this is a single-user app
--- (If you prefer RLS, set up policies appropriate to your auth setup)
-ALTER TABLE messages DISABLE ROW LEVEL SECURITY;
-ALTER TABLE wedding_state DISABLE ROW LEVEL SECURITY;
+-- RLS enabled with no anon/authenticated policies: blocks direct PostgREST access.
+-- The Next.js app uses service_role server-side only (bypasses RLS).
+ALTER TABLE messages ENABLE ROW LEVEL SECURITY;
+ALTER TABLE wedding_state ENABLE ROW LEVEL SECURITY;
+REVOKE ALL ON public.messages FROM anon, authenticated;
+REVOKE ALL ON public.wedding_state FROM anon, authenticated;
+GRANT SELECT, INSERT, UPDATE, DELETE ON public.messages TO service_role;
+GRANT SELECT, INSERT, UPDATE, DELETE ON public.wedding_state TO service_role;

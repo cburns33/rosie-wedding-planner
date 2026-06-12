@@ -42,10 +42,12 @@ export async function runZolaSync(): Promise<SyncResult> {
       (g) => g.events ?? []
     );
 
-    const giftTracker = await safeGet<RawZolaGiftTracker>(
-      client,
-      `/v3/gift_tracker/${registryId}`
-    );
+    const giftTracker = registryId
+      ? await safeGet<RawZolaGiftTracker>(
+          client,
+          `/v3/gift_tracker/${registryId}`
+        )
+      : null;
     const budget = await safeGet<RawZolaBudget>(client, "/v3/budgets");
 
     const previous = await getLatestSnapshot();
