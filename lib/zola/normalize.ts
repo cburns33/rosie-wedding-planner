@@ -6,11 +6,20 @@ import type { ZolaSnapshot } from "@/lib/types";
  */
 export interface RawZolaEvent {
   name?: string;
-  /** Zola event type, e.g. "wedding" / "reception" / "rehearsal_dinner". */
+  /**
+   * Zola event type. Real values are UPPERCASE, e.g. "WEDDING" /
+   * "REHEARSAL_DINNER" (matched case-insensitively below).
+   */
   type?: string;
   num_guests_attending?: number;
   num_guests_declined?: number;
   num_guests_not_responded?: number;
+  /**
+   * Menu definitions for the event (each option has a `name` but NO per-option
+   * selection tally). Real meal-choice counts live on individual guest RSVPs,
+   * which we deliberately do not pull (PII / aggregate-only). So we only emit a
+   * meal choice when a count field is actually present — never a fabricated 0.
+   */
   meal_options?: unknown[];
 }
 
@@ -53,8 +62,13 @@ function readMealOption(option: unknown): { label: string; count: number } | nul
     (typeof o.label === "string" && o.label) ||
     null;
   if (!label) return null;
-  const count = num(o.count ?? o.num_guests ?? o.quantity ?? o.guest_count);
-  return { label, count };
+  // Only treat this as a selection tally when a count field is actually
+  // present. Zola's `meal_options` are menu definitions (name only), so without
+  // this guard we'd fabricate "<entrée>: 0" and mislead the caterer prompt.
+  const rawCount =
+    o.count ?? o.num_guests ?? o.quantity ?? o.guest_count ?? o.num_guests_selected;
+  if (rawCount == null) return null;
+  return { label, count: num(rawCount) };
 }
 
 function isThankYouPending(status: string | null | undefined): boolean {

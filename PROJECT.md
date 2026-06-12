@@ -100,7 +100,10 @@ Nav: **Home** · **Ask Rosie** · Sign out. Rosie wordmark → `/`.
 
 ## Database (Supabase)
 
-Run `supabase/schema.sql` in the Supabase SQL editor on first setup. If the project predates vendor focuses, also run the migration block at the bottom of that file (`thread_key` + `vendor_memory`).
+Run `supabase/schema.sql` in the Supabase SQL editor on first setup. If the project predates a feature, re-run only the relevant migration block from that file:
+
+- **Zola integration** (top): `zola_snapshots` + `service_role` grants
+- **Vendor focuses** (bottom): `messages.thread_key` + `vendor_memory`
 
 **`messages`** — conversation history (scoped by thread)
 
@@ -194,7 +197,7 @@ On first message, `INITIAL_ROSIE_MESSAGE` is shown in UI and sent as `initialMes
 
 ### Auth (`middleware.ts`)
 
-Supabase magic link + `ALLOWED_EMAILS` allowlist. Protects all routes except `/login`, `/auth/callback`, `/api/auth/login`, and Sentry's `/monitoring` tunnel.
+Supabase magic link + `ALLOWED_EMAILS` allowlist. Protects all routes except `/login`, `/auth/callback`, `/api/auth/login`, Sentry's `/monitoring` tunnel, and Chase-only integration routes that self-protect with `CRON_SECRET` (`/api/cron/*`, `/api/integrations/zola/sync`, `/api/integrations/zola/import`).
 
 `DISABLE_AUTH=true` in `.env.local` bypasses auth in non-production only (for local UI work). Never set in Vercel production env.
 
@@ -209,10 +212,12 @@ Supabase magic link + `ALLOWED_EMAILS` allowlist. Protects all routes except `/l
 Rosie pulls live RSVP + registry aggregates from the couple's Zola account so the home card and chat answers are grounded in reality. Kelsie configures nothing; Chase sets `ZOLA_REFRESH_TOKEN`, `ZOLA_PROFILE_URL`, and `CRON_SECRET` (see `SETUP.md`).
 
 - **Client** (`lib/zola/client.ts`): adapts the MIT [zola-mcp](https://github.com/chrischall/zola-mcp) auth flow — the `usr` cookie JWT refreshes a short-lived session token against `mobile-api.zola.com`. Read-only; no write tools.
-- **Sync** (`lib/zola/sync.ts`): cron (every 6h via `vercel.json`) → fetch RSVPs/events, gift tracker, budget → `normalize.ts` → insert `zola_snapshots` row → `reconcile.ts` writes RSVP counts into `wedding_state.guests` (logs a `decisions[]` entry only on a >10% invited-count change).
-- **Surfacing**: home card `ZolaGuestsCard.tsx` (hidden until a snapshot exists), refetched by `PlanningHomeShell` on focus and the `zola-snapshot-updated` event. Chat injects an aggregate block into the system prompt and exposes the `get_zola_summary` tool.
-- **Privacy**: snapshots and API responses are aggregates only — no guest names/addresses. `lib/sentry-scrub.ts` strips integration payloads and tokens.
-- **Degradation**: sync failures never break home/chat; the last snapshot stays visible and Sentry gets a scrubbed alert. CSV fallback (`/api/integrations/zola/import`, `lib/zola/parse-csv.ts`) is Chase-only and not linked in any UI.
+- **Sync** (`lib/zola/sync.ts`): cron (once daily at noon UTC via `vercel.json`; Vercel Hobby limit) → fetch RSVPs/events, gift tracker (skipped if account has no registry yet), budget → `normalize.ts` → insert `zola_snapshots` row → `reconcile.ts` writes RSVP counts into `wedding_state.guests` (logs a `decisions[]` entry only on a >10% invited-count change).
+- **Headline event**: an account can have several events (wedding, rehearsal, etc.). The summary shown on the home card and in chat comes from one "headline" event. The API path picks it by event `type` (`wedding`/`reception`/`ceremony`), falling back to the largest headcount. Meal aggregates come from that headline event (catering-relevant), with a fallback to whichever event actually collected meal choices.
+- **Surfacing**: home card `ZolaGuestsCard.tsx` (hidden until a snapshot exists), refetched by `PlanningHomeShell` on focus and the `zola-snapshot-updated` event. Chat injects an aggregate block into the system prompt and exposes the `get_zola_summary` tool. Meal choices are only added to the caterer focus.
+- **Privacy**: snapshots and API responses are aggregates only — no guest names/addresses. `lib/sentry-scrub.ts` strips integration payloads and tokens. Open-text custom questions (e.g. dietary notes) are intentionally not captured.
+- **Degradation**: sync failures never break home/chat; the last snapshot stays visible and Sentry gets a scrubbed alert.
+- **CSV fallback** (`/api/integrations/zola/import`, `lib/zola/parse-csv.ts`): Chase-only, not linked in any UI. Auto-detects the export kind from cell contents (headers are unreliable — Zola names each event's status column after the event). RSVP exports are laid out as per-event column blocks: an event status column (`Attending`/`Declined`/`No Response`), followed by that event's own `Meal Choice` and custom-question columns. The parser ties each `Meal Choice` to its event block, ignores custom-question columns, picks the headline event by name (`wedding`/`reception`/`ceremony`), and counts everyone pending for a plain guest-list upload.
 
 ## File map
 

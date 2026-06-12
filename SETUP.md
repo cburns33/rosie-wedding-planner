@@ -11,7 +11,9 @@ This guide covers first-time setup and where things live. Day-to-day, you mostly
 
 1. Create a new project at [supabase.com](https://supabase.com)
 2. Go to **SQL Editor** and run the contents of `supabase/schema.sql`
-3. **Existing projects:** if you set up Rosie before vendor focuses, re-run only the migration block at the top of `schema.sql` (adds `messages.thread_key` and `vendor_memory` table). Chat will error until this is applied.
+3. **Existing projects:** re-run only the migration blocks you are missing from `schema.sql`:
+   - **Vendor focuses** (bottom of file): `messages.thread_key` + `vendor_memory` table. Chat will error until this is applied.
+   - **Zola integration** (top of file): `zola_snapshots` table **and** the `GRANT` / `REVOKE` lines for `service_role`. Creating the table alone is not enough — without grants, sync auth succeeds but inserts fail with permission denied.
 4. Grab credentials from **Settings → API**:
    - Project URL → `SUPABASE_URL` and `NEXT_PUBLIC_SUPABASE_URL` (base URL only, no `/rest/v1` suffix)
    - `anon` `public` key → `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` (or `NEXT_PUBLIC_SUPABASE_ANON_KEY`)
@@ -78,6 +80,8 @@ npx vercel link --project rosie-wedding-planner --scope cburns33s-projects
 npx vercel --prod
 ```
 
+**Hobby plan note:** Vercel Hobby allows cron jobs at most once per day. The project uses `0 12 * * *` (noon UTC) in `vercel.json`. Pushes to `main` deploy via GitHub normally; `npx vercel --prod` will fail if the cron schedule runs more often than daily.
+
 ## 5. Zola integration (read-only sync)
 
 Rosie pulls live RSVP and registry stats from Kelsie's Zola account so the home card and chat answers stay grounded. Kelsie never configures anything — this is entirely Chase-side env setup.
@@ -97,15 +101,17 @@ It uses Zola's unofficial mobile API (`mobile-api.zola.com`), the same path the 
 |----------|----------|-------|
 | `ZOLA_REFRESH_TOKEN` | Yes (once Zola exists) | The `usr` cookie JWT. Server only; never sent to the client or logged. |
 | `ZOLA_PROFILE_URL` | Recommended | The couple's Zola wedding/registry URL. Powers the **Open Zola →** link. |
-| `CRON_SECRET` | Yes | Random string. Protects the cron, manual sync, and CSV import routes. |
+| `CRON_SECRET` | Yes | Random string. Protects the cron, manual sync, and CSV import routes. Must be named exactly `CRON_SECRET` (not `ZOLA_CRON_SECRET`). |
 
-Add these in the [Vercel env settings](https://vercel.com/cburns33s-projects/rosie-wedding-planner/settings/environment-variables) (Production + Development) and in `.env.local` for local work.
+Add these in the [Vercel env settings](https://vercel.com/cburns33s-projects/rosie-wedding-planner/settings/environment-variables) (Production + Development) and in `.env.local` for local work. After changing env vars on Vercel, redeploy so the runtime picks them up.
+
+**No registry yet:** sync still succeeds if the Zola account has no registry (`registry: null`). RSVP counts populate; gift tracker and registry lines on the home card stay empty until a registry is created on Zola.
 
 ### How it runs
 
-- **Cron:** `vercel.json` schedules `GET /api/cron/zola-sync` every 6 hours. On success it writes a row to `zola_snapshots`, reconciles `wedding_state.guests` (RSVP counts), and the home card refreshes.
+- **Cron:** `vercel.json` schedules `GET /api/cron/zola-sync` once daily at **noon UTC** (`0 12 * * *`; Vercel Hobby limit). On success it writes a row to `zola_snapshots`, reconciles `wedding_state.guests` (RSVP counts), and the home card refreshes.
 - **Manual sync:** `POST /api/integrations/zola/sync` with header `Authorization: Bearer $CRON_SECRET` runs a sync on demand.
-- **CSV fallback (Chase only, not in any UI):** `POST /api/integrations/zola/import` with the same header and a multipart `file` field (a Zola RSVP CSV export) backfills a snapshot when the API is unavailable.
+- **CSV fallback (Chase only, not in any UI):** `POST /api/integrations/zola/import` with the same header and a multipart `file` field backfills a snapshot when the API is unavailable. It accepts either a **Track RSVPs → Export** (any tab; the Overview export is most complete since it carries every event) or a **guest-list upload**. The parser auto-detects which from the file contents, so you don't pass a type. RSVP exports may contain several events and several `Meal Choice` columns; only the wedding/reception event's numbers drive the home card. Open-text custom-question answers (e.g. dietary notes) are ignored on purpose.
 - **Graceful degradation:** if a sync fails, the home and chat keep working on the last known snapshot, and Sentry receives a scrubbed alert (no token, no guest data).
 
 ### Annual maintenance
@@ -114,12 +120,16 @@ The `usr` token expires after ~1 year (or if Zola signs the account out). When s
 
 ### Verify
 
-With `ZOLA_REFRESH_TOKEN` set locally, hit the sync route and confirm a `zola_snapshots` row appears:
+With `ZOLA_REFRESH_TOKEN` and `CRON_SECRET` set locally, hit the sync route and confirm a `zola_snapshots` row appears:
 
 ```bash
 curl -X POST http://localhost:3000/api/integrations/zola/sync \
   -H "Authorization: Bearer $CRON_SECRET"
 ```
+
+Success looks like `{"ok":true,"invited":…,"attending":…}`. Query Supabase: `select * from zola_snapshots order by imported_at desc limit 1`.
+
+Production manual sync uses the same header against `https://rosie-wedding-planner.vercel.app/api/integrations/zola/sync`.
 
 The Zola read-only client is adapted from the MIT-licensed [zola-mcp](https://github.com/chrischall/zola-mcp) project (auth flow only — no write tools).
 
@@ -185,6 +195,7 @@ You do not need to operate Sentry, Vercel, or Supabase on a schedule. For a sing
 | Something breaks in production | Open [Sentry Issues](https://talos-advisory.sentry.io/issues/), fix code, push again. |
 | You work locally without magic links | Keep `DISABLE_AUTH=true` in `.env.local` only. |
 | You hand off to Kelsie | Share https://rosie-wedding-planner.vercel.app and confirm her email is in `ALLOWED_EMAILS`. |
+| Zola RSVP stats stop updating | The `usr` token likely expired (~1 year) or Zola signed the account out. Sentry alerts on the 401. Recapture the `usr` cookie (section 5) and update `ZOLA_REFRESH_TOKEN` on Vercel, then redeploy. |
 
 Billing: all three services have free tiers; one active user should stay free or very cheap. Optional: glance at usage once a month.
 
