@@ -1,5 +1,21 @@
 -- Run this in your Supabase SQL editor to set up the Rosie database
 
+-- ---------------------------------------------------------------------------
+-- Migration block (run on existing projects too): Zola integration snapshots.
+-- Stores normalized, aggregate-only snapshots pulled from the Zola mobile API
+-- (or CSV fallback). No guest names/addresses live here — aggregates only.
+-- ---------------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS zola_snapshots (
+  id            bigserial PRIMARY KEY,
+  imported_at   timestamptz NOT NULL DEFAULT now(),
+  source        text NOT NULL,  -- 'api_sync' | 'csv_rsvp' | 'csv_guests'
+  data          jsonb NOT NULL,
+  raw_file_hash text
+);
+CREATE INDEX IF NOT EXISTS zola_snapshots_imported_at_idx
+  ON zola_snapshots (imported_at DESC);
+ALTER TABLE zola_snapshots DISABLE ROW LEVEL SECURITY;
+
 -- Conversation history
 CREATE TABLE IF NOT EXISTS messages (
   id bigserial PRIMARY KEY,

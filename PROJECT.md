@@ -89,6 +89,10 @@ Chat data uses the service role key server-side. Auth uses the publishable key +
 | `/login` | Magic-link sign-in |
 | `/api/chat` | Chat POST (Anthropic + tools) |
 | `/api/wedding-state` | GET read-only wedding state (for client refetch) |
+| `/api/integrations/zola` | GET latest Zola aggregates for the home card (magic-link; aggregates only) |
+| `/api/integrations/zola/sync` | POST manual Zola sync (Chase; `CRON_SECRET`) |
+| `/api/integrations/zola/import` | POST CSV fallback import (Chase; `CRON_SECRET`; not in UI) |
+| `/api/cron/zola-sync` | GET scheduled Zola sync (Vercel Cron; `CRON_SECRET`) |
 
 Nav: **Home** · **Ask Rosie** · Sign out. Rosie wordmark → `/`.
 
@@ -123,6 +127,18 @@ Run `supabase/schema.sql` in the Supabase SQL editor on first setup. If the proj
 | vendor | text PK (e.g. `caterer`) |
 | markdown | text |
 | updated_at | timestamptz |
+
+**`zola_snapshots`** — normalized, aggregate-only snapshots from the Zola integration
+
+| column | type |
+|--------|------|
+| id | bigserial PK |
+| imported_at | timestamptz |
+| source | text ('api_sync' \| 'csv_rsvp' \| 'csv_guests') |
+| data | jsonb (`ZolaSnapshot` — aggregates only, no guest names) |
+| raw_file_hash | text, nullable (CSV dedupe) |
+
+Latest snapshot = most recent `imported_at`. See the Zola integration section below.
 
 The `wedding_state.data` shape is in `lib/types.ts` (`WeddingState`), seeded in `lib/wedding-defaults.ts`.
 
@@ -188,6 +204,16 @@ Supabase magic link + `ALLOWED_EMAILS` allowlist. Protects all routes except `/l
 
 ---
 
+### Zola integration (read-only)
+
+Rosie pulls live RSVP + registry aggregates from the couple's Zola account so the home card and chat answers are grounded in reality. Kelsie configures nothing; Chase sets `ZOLA_REFRESH_TOKEN`, `ZOLA_PROFILE_URL`, and `CRON_SECRET` (see `SETUP.md`).
+
+- **Client** (`lib/zola/client.ts`): adapts the MIT [zola-mcp](https://github.com/chrischall/zola-mcp) auth flow — the `usr` cookie JWT refreshes a short-lived session token against `mobile-api.zola.com`. Read-only; no write tools.
+- **Sync** (`lib/zola/sync.ts`): cron (every 6h via `vercel.json`) → fetch RSVPs/events, gift tracker, budget → `normalize.ts` → insert `zola_snapshots` row → `reconcile.ts` writes RSVP counts into `wedding_state.guests` (logs a `decisions[]` entry only on a >10% invited-count change).
+- **Surfacing**: home card `ZolaGuestsCard.tsx` (hidden until a snapshot exists), refetched by `PlanningHomeShell` on focus and the `zola-snapshot-updated` event. Chat injects an aggregate block into the system prompt and exposes the `get_zola_summary` tool.
+- **Privacy**: snapshots and API responses are aggregates only — no guest names/addresses. `lib/sentry-scrub.ts` strips integration payloads and tokens.
+- **Degradation**: sync failures never break home/chat; the last snapshot stays visible and Sentry gets a scrubbed alert. CSV fallback (`/api/integrations/zola/import`, `lib/zola/parse-csv.ts`) is Chase-only and not linked in any UI.
+
 ## File map
 
 ```
@@ -200,6 +226,10 @@ app/
   dashboard/page.tsx          redirect → /
   api/chat/route.ts           Anthropic + tool loop + scoped message saves
   api/wedding-state/route.ts  GET wedding state JSON
+  api/integrations/zola/route.ts        GET Zola aggregates for home card
+  api/integrations/zola/sync/route.ts   POST manual Zola sync (CRON_SECRET)
+  api/integrations/zola/import/route.ts POST CSV fallback (CRON_SECRET)
+  api/cron/zola-sync/route.ts           GET scheduled sync (Vercel Cron)
   auth/callback/route.ts      magic-link callback
   global-error.tsx            Sentry root error boundary
 
@@ -214,6 +244,7 @@ components/
   PlanningHome.tsx            briefing layout (hero, up next, progress, summaries)
   PlanningHomeShell.tsx       client refetch wrapper
   Dashboard.tsx               budget, venue, vendors, decisions (interactive cards)
+  ZolaGuestsCard.tsx          Zola-powered RSVP + registry home card
   ChatPageShell.tsx           nav + ChatInterface wrapper
   ChatInterface.tsx           messages, intro, vendor header, suggestFocus link
   IntroScreen.tsx             signature intro (main chat first visit)
@@ -227,6 +258,14 @@ lib/
   wedding-defaults.ts         DEFAULT_WEDDING_STATE
   intro.ts                    shouldShowIntro()
   deep-set.ts, supabase.ts, auth.ts, supabase-env.ts
+  zola/                       Zola integration (read-only)
+    client.ts                 mobile API auth + read-only fetch
+    normalize.ts              raw API/CSV → ZolaSnapshot + public aggregates
+    sync.ts                   orchestrate fetch → snapshot → reconcile
+    reconcile.ts              fold RSVP aggregates into wedding_state
+    store.ts                  zola_snapshots read/write + profile URL
+    parse-csv.ts              CSV fallback parser (Chase only)
+    cron-auth.ts              CRON_SECRET bearer check
 
 prd/
   vendor-chats.md             spec for vendor focuses (implemented)

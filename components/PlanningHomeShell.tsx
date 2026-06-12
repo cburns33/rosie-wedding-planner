@@ -4,9 +4,11 @@ import { useState, useEffect, useCallback } from "react";
 import Nav from "./Nav";
 import PlanningHome from "./PlanningHome";
 import type { WeddingState } from "@/lib/types";
+import type { ZolaAggregates } from "@/lib/zola/normalize";
 
 interface PlanningHomeShellProps {
   initialData: WeddingState;
+  initialZola?: ZolaAggregates | null;
 }
 
 /**
@@ -16,8 +18,10 @@ interface PlanningHomeShellProps {
  */
 export default function PlanningHomeShell({
   initialData,
+  initialZola = null,
 }: PlanningHomeShellProps) {
   const [data, setData] = useState(initialData);
+  const [zola, setZola] = useState<ZolaAggregates | null>(initialZola);
 
   const refetch = useCallback(async () => {
     try {
@@ -28,25 +32,43 @@ export default function PlanningHomeShell({
     }
   }, []);
 
+  const refetchZola = useCallback(async () => {
+    try {
+      const res = await fetch("/api/integrations/zola", { cache: "no-store" });
+      if (res.ok) setZola(await res.json());
+    } catch {
+      // Keep showing the last good snapshot on a transient failure.
+    }
+  }, []);
+
   useEffect(() => {
     const onVisible = () => {
-      if (document.visibilityState === "visible") refetch();
+      if (document.visibilityState === "visible") {
+        refetch();
+        refetchZola();
+      }
     };
-    window.addEventListener("focus", refetch);
+    const onFocus = () => {
+      refetch();
+      refetchZola();
+    };
+    window.addEventListener("focus", onFocus);
     window.addEventListener("wedding-state-updated", refetch);
+    window.addEventListener("zola-snapshot-updated", refetchZola);
     document.addEventListener("visibilitychange", onVisible);
     return () => {
-      window.removeEventListener("focus", refetch);
+      window.removeEventListener("focus", onFocus);
       window.removeEventListener("wedding-state-updated", refetch);
+      window.removeEventListener("zola-snapshot-updated", refetchZola);
       document.removeEventListener("visibilitychange", onVisible);
     };
-  }, [refetch]);
+  }, [refetch, refetchZola]);
 
   return (
     <div className="flex flex-col min-h-full">
       <Nav />
       <main className="flex-1 pt-16 overflow-y-auto">
-        <PlanningHome data={data} />
+        <PlanningHome data={data} zola={zola} />
       </main>
     </div>
   );

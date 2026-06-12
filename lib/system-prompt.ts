@@ -1,5 +1,41 @@
-import type { WeddingState } from "./types";
+import type { WeddingState, ZolaSnapshot } from "./types";
 import { VENDOR_KEYS } from "./vendors";
+
+export interface ZolaPromptContext {
+  snapshot: ZolaSnapshot;
+  profileUrl: string | null;
+}
+
+/** Aggregate-only Zola context for the system prompt. Never includes names. */
+function buildZolaBlock(zola: ZolaPromptContext, isCaterer: boolean): string {
+  const { summary, registry, meals } = zola.snapshot;
+  const lines: string[] = [
+    `- RSVPs: ${summary.attending} attending · ${summary.pending} awaiting reply · ${summary.declined} declined (of ${summary.invited} invited)`,
+  ];
+  if (registry) {
+    lines.push(
+      `- Registry: ${registry.giftsReceived} gifts received · ${registry.thankYouPending} thank-you note${registry.thankYouPending === 1 ? "" : "s"} pending`
+    );
+  }
+  if (isCaterer && meals && Object.keys(meals.choices).length > 0) {
+    const choiceLine = Object.entries(meals.choices)
+      .map(([name, count]) => `${name}: ${count}`)
+      .join(" · ");
+    lines.push(`- Meal choices (for final catering numbers): ${choiceLine}`);
+  }
+
+  const handoff = zola.profileUrl
+    ? `For anything name-level or operational (adding a guest, sending invites, marking a gift thanked), point her to Zola: ${zola.profileUrl}`
+    : "For anything name-level or operational (adding a guest, sending invites, marking a gift thanked), point her to Zola.";
+
+  return `**Live wedding data from Zola**
+
+These figures come from Kelsie's Zola account and are authoritative when she asks about guests, RSVPs, or the registry. Cite them naturally — "From your Zola guest list…" — and never mention syncing, APIs, tokens, or spreadsheets.
+
+${lines.join("\n")}
+
+You have aggregates only here, not individual guest names. When she asks who hasn't RSVP'd or how the count looks, answer from these numbers. ${handoff}`;
+}
 
 const ROSIE_BASE_PROMPT = `You are Rosie, a warm and deeply knowledgeable wedding planner assistant. You were created as a gift for Kelsie Burns by her brother Chase, to help her plan her wedding to Hank Harris.
 
@@ -97,13 +133,18 @@ export interface VendorFocusContext {
 
 export function buildSystemPrompt(
   weddingData: WeddingState,
-  vendorFocus?: VendorFocusContext
+  vendorFocus?: VendorFocusContext,
+  zola?: ZolaPromptContext | null
 ): string {
   const stateBlock = `**Current wedding planning state**
 
 Here is everything tracked so far. Reference this when Kelsie asks about decisions or status, and update it via the tool when anything changes:
 
 ${JSON.stringify(weddingData, null, 2)}`;
+
+  const zolaBlock = zola
+    ? `\n\n${buildZolaBlock(zola, vendorFocus?.key === "caterer")}`
+    : "";
 
   if (!vendorFocus) {
     return `${ROSIE_BASE_PROMPT}
@@ -112,7 +153,7 @@ ${JSON.stringify(weddingData, null, 2)}`;
 
 This is the main conversation with Kelsie. If the discussion narrows to one specific vendor and stays there for a few turns (comparing options, going through quotes, working out the details for that one vendor), gently offer once to continue in that vendor's dedicated focus — for example: "Want to pick this up in your florist focus?" Phrase it warmly, never as jargon, and never force it. If she agrees (or asks for the link), call \`suggest_vendor_focus\` with the vendor and a short reason; this surfaces a soft link for her. Don't suggest on the first mention, and don't suggest more than once for the same vendor in a row.
 
-${stateBlock}`;
+${stateBlock}${zolaBlock}`;
   }
 
   return `${ROSIE_BASE_PROMPT}
@@ -133,7 +174,7 @@ This memory is internal — your own notes. Never quote it verbatim to Kelsie or
 
 ${vendorFocus.memory?.trim() ? vendorFocus.memory : "(empty — this is the first time opening this focus)"}
 
-${stateBlock}`;
+${stateBlock}${zolaBlock}`;
 }
 
 export const WEDDING_TOOLS = [
@@ -232,6 +273,16 @@ const UPDATE_VENDOR_MEMORY_TOOL = {
   },
 };
 
+const GET_ZOLA_SUMMARY_TOOL = {
+  name: "get_zola_summary",
+  description:
+    "Read the latest aggregate RSVP and registry figures from Kelsie's Zola account (attending/pending/declined, invited, gifts received, thank-yous pending, and meal choices when available). Use mid-conversation when she asks about guest count, RSVPs, or the registry. Returns aggregates only — no guest names.",
+  input_schema: {
+    type: "object" as const,
+    properties: {},
+  },
+};
+
 /** Tools available depend on whether we're in a vendor focus or the main chat. */
 export function getTools(vendorKey?: string | null) {
   if (vendorKey) {
@@ -239,9 +290,10 @@ export function getTools(vendorKey?: string | null) {
       ...WEDDING_TOOLS,
       NOTE_FOR_VENDOR_TOOL,
       UPDATE_VENDOR_MEMORY_TOOL,
+      GET_ZOLA_SUMMARY_TOOL,
     ];
   }
-  return [...WEDDING_TOOLS, SUGGEST_VENDOR_FOCUS_TOOL];
+  return [...WEDDING_TOOLS, SUGGEST_VENDOR_FOCUS_TOOL, GET_ZOLA_SUMMARY_TOOL];
 }
 
 export const INITIAL_ROSIE_MESSAGE =

@@ -1,6 +1,8 @@
 import Link from "next/link";
 import type { WeddingState } from "@/lib/types";
+import type { ZolaAggregates } from "@/lib/zola/normalize";
 import Dashboard from "./Dashboard";
+import ZolaGuestsCard from "./ZolaGuestsCard";
 import {
   weeksToGo,
   dateLabel,
@@ -41,9 +43,10 @@ const CARD_INTERACTIVE =
 
 interface PlanningHomeProps {
   data: WeddingState;
+  zola?: ZolaAggregates | null;
 }
 
-export default function PlanningHome({ data }: PlanningHomeProps) {
+export default function PlanningHome({ data, zola }: PlanningHomeProps) {
   const weeks = weeksToGo(data);
   const upNext = getUpNext(data);
   const milestones = getMilestones(data);
@@ -230,6 +233,16 @@ export default function PlanningHome({ data }: PlanningHomeProps) {
             )}
           </SummaryCard>
         </section>
+
+        {/* Guests & registry — Zola-powered (hidden until a snapshot exists) */}
+        {zola?.available && (
+          <section
+            className="briefing-item"
+            style={{ animationDelay: "350ms" }}
+          >
+            <ZolaGuestsCard data={zola} />
+          </section>
+        )}
 
         {/* Full details */}
         <section

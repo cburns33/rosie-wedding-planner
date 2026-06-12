@@ -65,6 +65,7 @@ These are configured for **Production** and **Development**. Copy from `.env.loc
 | `ALLOWED_EMAILS` | Comma-separated allowlist |
 | `NEXT_PUBLIC_SENTRY_DSN`, `SENTRY_DSN` | Sentry |
 | `SENTRY_AUTH_TOKEN` | Build-time source maps |
+| `ZOLA_REFRESH_TOKEN`, `ZOLA_PROFILE_URL`, `CRON_SECRET` | Zola integration (see section 5) |
 
 Do **not** set `DISABLE_AUTH` on Vercel.
 
@@ -77,7 +78,52 @@ npx vercel link --project rosie-wedding-planner --scope cburns33s-projects
 npx vercel --prod
 ```
 
-## 5. Sentry (error monitoring)
+## 5. Zola integration (read-only sync)
+
+Rosie pulls live RSVP and registry stats from Kelsie's Zola account so the home card and chat answers stay grounded. Kelsie never configures anything — this is entirely Chase-side env setup.
+
+It uses Zola's unofficial mobile API (`mobile-api.zola.com`), the same path the iOS app uses. This is personal automation and not endorsed by Zola; see `prd/zola-integration.md` for the accepted ToS risk. There is no write-back to Zola.
+
+### Capture the refresh token
+
+1. Make sure Kelsie's Zola account exists (Chase can use the shared login).
+2. Sign in at [zola.com/account/login](https://www.zola.com/account/login) in any browser.
+3. Open DevTools → **Application** → **Cookies** → `https://www.zola.com`.
+4. Copy the value of the `usr` cookie — it's a JWT that lasts about a year and doubles as the refresh token.
+
+### Set the env vars (Vercel + local)
+
+| Variable | Required | Notes |
+|----------|----------|-------|
+| `ZOLA_REFRESH_TOKEN` | Yes (once Zola exists) | The `usr` cookie JWT. Server only; never sent to the client or logged. |
+| `ZOLA_PROFILE_URL` | Recommended | The couple's Zola wedding/registry URL. Powers the **Open Zola →** link. |
+| `CRON_SECRET` | Yes | Random string. Protects the cron, manual sync, and CSV import routes. |
+
+Add these in the [Vercel env settings](https://vercel.com/cburns33s-projects/rosie-wedding-planner/settings/environment-variables) (Production + Development) and in `.env.local` for local work.
+
+### How it runs
+
+- **Cron:** `vercel.json` schedules `GET /api/cron/zola-sync` every 6 hours. On success it writes a row to `zola_snapshots`, reconciles `wedding_state.guests` (RSVP counts), and the home card refreshes.
+- **Manual sync:** `POST /api/integrations/zola/sync` with header `Authorization: Bearer $CRON_SECRET` runs a sync on demand.
+- **CSV fallback (Chase only, not in any UI):** `POST /api/integrations/zola/import` with the same header and a multipart `file` field (a Zola RSVP CSV export) backfills a snapshot when the API is unavailable.
+- **Graceful degradation:** if a sync fails, the home and chat keep working on the last known snapshot, and Sentry receives a scrubbed alert (no token, no guest data).
+
+### Annual maintenance
+
+The `usr` token expires after ~1 year (or if Zola signs the account out). When sync starts 401ing, Sentry alerts; recapture the `usr` cookie and update `ZOLA_REFRESH_TOKEN` on Vercel, then redeploy.
+
+### Verify
+
+With `ZOLA_REFRESH_TOKEN` set locally, hit the sync route and confirm a `zola_snapshots` row appears:
+
+```bash
+curl -X POST http://localhost:3000/api/integrations/zola/sync \
+  -H "Authorization: Bearer $CRON_SECRET"
+```
+
+The Zola read-only client is adapted from the MIT-licensed [zola-mcp](https://github.com/chrischall/zola-mcp) project (auth flow only — no write tools).
+
+## 6. Sentry (error monitoring)
 
 Rosie reports crashes and server errors to [Sentry](https://talos-advisory.sentry.io) (`talos-advisory/javascript-nextjs`). Chat message bodies are scrubbed before upload; session replay is off.
 

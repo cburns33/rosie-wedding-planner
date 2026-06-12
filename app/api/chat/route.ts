@@ -6,7 +6,9 @@ import {
   getTools,
   vendorOpeningMessage,
   type VendorFocusContext,
+  type ZolaPromptContext,
 } from "@/lib/system-prompt";
+import { getLatestSnapshot, getZolaProfileUrl } from "@/lib/zola/store";
 import { DEFAULT_WEDDING_STATE } from "@/lib/wedding-defaults";
 import { deepSet } from "@/lib/deep-set";
 import {
@@ -132,15 +134,21 @@ export async function POST(req: Request) {
     await markIntroCompleted();
   }
 
-  const [dbMessages, weddingData] = await Promise.all([
+  const [dbMessages, weddingData, storedZola, zolaProfileUrl] = await Promise.all([
     getMessages(threadKey),
     getWeddingData(),
+    getLatestSnapshot(),
+    getZolaProfileUrl(),
   ]);
+
+  const zolaContext: ZolaPromptContext | null = storedZola
+    ? { snapshot: storedZola.snapshot, profileUrl: zolaProfileUrl }
+    : null;
 
   const vendorFocus = threadKey ? await buildVendorFocus(threadKey) : undefined;
   const tools = getTools(threadKey) as Anthropic.Tool[];
 
-  const systemPrompt = buildSystemPrompt(weddingData, vendorFocus);
+  const systemPrompt = buildSystemPrompt(weddingData, vendorFocus, zolaContext);
 
   const apiMessages: Anthropic.MessageParam[] = [];
 
@@ -204,6 +212,17 @@ export async function POST(req: Request) {
         } else {
           result = "Unknown vendor.";
         }
+      } else if (block.name === "get_zola_summary") {
+        if (storedZola) {
+          result = JSON.stringify({
+            rsvps: storedZola.snapshot.summary,
+            registry: storedZola.snapshot.registry ?? null,
+            meals: storedZola.snapshot.meals ?? null,
+            syncedAt: storedZola.snapshot.syncedAt,
+          });
+        } else {
+          result = "No Zola data available yet — use the planning estimates instead.";
+        }
       } else if (block.name === "suggest_vendor_focus") {
         const input = block.input as { vendor: string; reason?: string };
         if (isVendorKey(input.vendor)) {
@@ -228,7 +247,11 @@ export async function POST(req: Request) {
     const updatedFocus = threadKey
       ? await buildVendorFocus(threadKey)
       : undefined;
-    const updatedSystemPrompt = buildSystemPrompt(updatedData, updatedFocus);
+    const updatedSystemPrompt = buildSystemPrompt(
+      updatedData,
+      updatedFocus,
+      zolaContext
+    );
 
     response = await anthropic.messages.create({
       model: "claude-sonnet-4-6",

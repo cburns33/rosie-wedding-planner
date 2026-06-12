@@ -20,6 +20,10 @@ export const DEFAULT_WEDDING_STATE: WeddingState = {
   guests: {
     estimated: "250–300",
     finalCount: null,
+    rsvpAttending: null,
+    rsvpPending: null,
+    rsvpDeclined: null,
+    lastZolaImportAt: null,
   },
   vendors: {
     photographer: { status: "undecided", name: null, contact: null, notes: null, quoted_cost: null, booked_cost: null },
@@ -44,5 +48,13 @@ export const DEFAULT_WEDDING_STATE: WeddingState = {
     hub: "Houston",
     decided: false,
     notes: null,
+  },
+  integrations: {
+    zola: {
+      profileUrl: null,
+      syncMethod: "none",
+      lastSyncAt: null,
+      apiConnected: false,
+    },
   },
 };

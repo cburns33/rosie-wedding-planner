@@ -2,6 +2,8 @@ import PlanningHomeShell from "@/components/PlanningHomeShell";
 import { getSupabase } from "@/lib/supabase";
 import { DEFAULT_WEDDING_STATE } from "@/lib/wedding-defaults";
 import type { WeddingState } from "@/lib/types";
+import { getLatestSnapshot, getZolaProfileUrl } from "@/lib/zola/store";
+import { toAggregates, type ZolaAggregates } from "@/lib/zola/normalize";
 
 export const dynamic = "force-dynamic";
 
@@ -18,7 +20,26 @@ async function getWeddingData(): Promise<WeddingState> {
   }
 }
 
+async function getZolaAggregates(): Promise<ZolaAggregates | null> {
+  try {
+    const [stored, profileUrl] = await Promise.all([
+      getLatestSnapshot(),
+      getZolaProfileUrl(),
+    ]);
+    return toAggregates(
+      stored?.snapshot ?? null,
+      stored?.importedAt ?? null,
+      profileUrl
+    );
+  } catch {
+    return null;
+  }
+}
+
 export default async function HomePage() {
-  const weddingData = await getWeddingData();
-  return <PlanningHomeShell initialData={weddingData} />;
+  const [weddingData, zola] = await Promise.all([
+    getWeddingData(),
+    getZolaAggregates(),
+  ]);
+  return <PlanningHomeShell initialData={weddingData} initialZola={zola} />;
 }

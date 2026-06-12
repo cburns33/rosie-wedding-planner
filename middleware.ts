@@ -5,6 +5,15 @@ import { isEmailAllowed } from "@/lib/auth";
 
 const PUBLIC_PATHS = ["/login", "/auth/callback"];
 
+// Chase-only integration routes that self-protect with CRON_SECRET (Bearer
+// token). They must skip magic-link auth so Vercel Cron and manual server
+// calls — which carry no Supabase session cookie — can reach them.
+const SECRET_PROTECTED_PREFIXES = [
+  "/api/cron/",
+  "/api/integrations/zola/sync",
+  "/api/integrations/zola/import",
+];
+
 export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
 
@@ -19,6 +28,10 @@ export async function middleware(request: NextRequest) {
   }
 
   if (pathname === "/api/auth/login") {
+    return NextResponse.next();
+  }
+
+  if (SECRET_PROTECTED_PREFIXES.some((p) => pathname.startsWith(p))) {
     return NextResponse.next();
   }
 

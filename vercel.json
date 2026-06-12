@@ -1,0 +1,8 @@
+{
+  "crons": [
+    {
+      "path": "/api/cron/zola-sync",
+      "schedule": "0 */6 * * *"
+    }
+  ]
+}

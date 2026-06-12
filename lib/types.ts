@@ -33,6 +33,10 @@ export interface WeddingState {
   guests: {
     estimated: string;
     finalCount: number | null;
+    rsvpAttending: number | null;
+    rsvpPending: number | null;
+    rsvpDeclined: number | null;
+    lastZolaImportAt: string | null;
   };
   vendors: Record<string, VendorEntry>;
   decisions: Array<{ date: string; decision: string }>;
@@ -48,6 +52,50 @@ export interface WeddingState {
     decided: boolean;
     notes: string | null;
   };
+  integrations: {
+    zola: {
+      profileUrl: string | null;
+      syncMethod: "none" | "csv" | "api";
+      lastSyncAt: string | null;
+      apiConnected: boolean;
+    };
+  };
+}
+
+/**
+ * Normalized, aggregate-only snapshot of the couple's Zola account. Stored in
+ * the `zola_snapshots` table (jsonb `data`). Never holds guest names/addresses.
+ */
+export interface ZolaSnapshot {
+  summary: {
+    invited: number;
+    attending: number;
+    declined: number;
+    pending: number;
+    households: number;
+  };
+  events?: Array<{
+    name: string;
+    attending: number;
+    declined: number;
+    pending: number;
+  }>;
+  meals?: {
+    /** Aggregate meal-choice counts for caterer focus. */
+    choices: Record<string, number>;
+    dietaryNotes?: string[];
+  };
+  registry?: {
+    giftsReceived: number;
+    thankYouPending: number;
+    fundsReceived?: number;
+  };
+  budget?: {
+    plannedTotal: number;
+    spentTotal: number;
+    categoryCount: number;
+  };
+  syncedAt: string;
 }
 
 export interface Message {
