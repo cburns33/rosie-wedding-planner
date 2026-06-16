@@ -1,36 +1,28 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Rosie — Wedding Planner Agent
 
-## Getting Started
+Personalized wedding planning AI for Kelsie Burns (spring 2027). Built by Chase Burns.
 
-First, run the development server:
+## Docs
+
+| Doc | Purpose |
+|-----|---------|
+| [`PROJECT.md`](./PROJECT.md) | Architecture, routes, database, design system, known issues |
+| [`SETUP.md`](./SETUP.md) | Supabase, env vars, Vercel, first-time setup |
+| [`qa/README.md`](./qa/README.md) | Local QA walkthroughs and reset scripts |
+| [`qa/intro-review.md`](./qa/intro-review.md) | Intro/aesthetic QA checklist and issue log |
+
+## Quick start
 
 ```bash
+cp .env.local.example .env.local   # fill in values
+npm install
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Open [http://localhost:3000](http://localhost:3000). Local UI work can use `DISABLE_AUTH=true` in `.env.local` (never on Vercel).
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+```bash
+npm test        # Vitest unit tests
+```
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
-
-## Learn More
-
-To learn more about Next.js, take a look at the following resources:
-
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
-
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
-
-## Deploy on Vercel
-
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+Production: [rosie-wedding-planner.vercel.app](https://rosie-wedding-planner.vercel.app)

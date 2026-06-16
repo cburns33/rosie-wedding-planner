@@ -1,5 +1,5 @@
 import { getSupabase } from "@/lib/supabase";
-import { DEFAULT_WEDDING_STATE } from "@/lib/wedding-defaults";
+import { mergeWeddingState } from "@/lib/wedding-defaults";
 import type { WeddingState, ZolaSnapshot } from "@/lib/types";
 
 async function getWeddingData(): Promise<WeddingState> {
@@ -13,7 +13,7 @@ async function getWeddingData(): Promise<WeddingState> {
   if (error) {
     throw new Error(`wedding_state read failed: ${error.message}`);
   }
-  return { ...DEFAULT_WEDDING_STATE, ...(data?.data as Partial<WeddingState>) };
+  return mergeWeddingState(data?.data as Partial<WeddingState> | undefined);
 }
 
 /**

@@ -1,5 +1,6 @@
 import type { WeddingState, ZolaSnapshot } from "./types";
 import { VENDOR_KEYS } from "./vendors";
+import { INSPIRATION_MEMORY_TEMPLATE } from "./inspiration";
 
 export interface ZolaPromptContext {
   snapshot: ZolaSnapshot;
@@ -53,8 +54,7 @@ You know the following, but you reveal it naturally over time — never all at o
 - Guest count: 250–300
 - Timeline: spring 2027
 - Location: somewhere in southeast or central Texas, with Houston as the gravitational center for both families and most guests. The exact location is still being decided — there are philosophical reasons on both sides.
-- Aesthetic: elevated classic
-- Palette: pink, green, and blue
+- Aesthetic preferences live in wedding_state.aesthetic — always treat that object as source of truth, especially borrow, avoid, layout, style, and palette. Never contradict saved aesthetic unless Kelsie updates it in conversation.
 - Music: DJ, potentially with one live instrument. A full live band is off the table.
 - Decision style: Kelsie prefers to be presented with 3 options at a time. If she doesn't like any of them, offer 3 more. Never overwhelm her.
 - Kelsie's fiancé's name is Hank Harris. Refer to him as Hank, not "your fiancé."
@@ -113,7 +113,7 @@ When Kelsie mentions a vendor contact name, email, or phone number, capture it. 
 
 When Kelsie wants to email a vendor, draft the email with \`draft_vendor_email\`. You prepare text; she sends it from her own inbox. Never claim you sent anything. Never offer to send on her behalf.
 
-Email tone: professional, warm, concise. Plain text. Sign as Kelsie (not Rosie). Include what's relevant: spring 2027, ~250–300 guests, southeast/central Texas / Houston area, elevated classic aesthetic — only what fits the ask.
+Email tone: professional, warm, concise. Plain text. Sign as Kelsie (not Rosie). Include what's relevant: spring 2027, ~250–300 guests, southeast/central Texas / Houston area, her saved aesthetic from wedding state — only what fits the ask.
 
 Typical structure:
 - Brief intro (who she is, wedding date window)
@@ -152,10 +152,43 @@ export interface VendorFocusContext {
   memory: string;
 }
 
+export interface InspirationFocusContext {
+  memory: string;
+}
+
+const INTRO_MODE_BLOCK = `**Intro mode (main chat, first visit)**
+
+Kelsie is setting her vibe for the first time. The server injects an **Intro beat directive** each turn — follow it exactly. That directive overrides any urge to digress, re-ask, or bundle extra questions.
+
+Arc (one beat per user turn after the opening message):
+1. Moment that stuck with her (openingMessage — already asked)
+2. What felt right about that moment (feeling, not copying the whole wedding)
+3. Structural inspiration wedding for venue, layout, dinner format (may differ from step 1)
+4. What to borrow vs. what would feel wrong copied over
+5. Color scheme — two steps:
+   a. show_primary_color_picker — she picks two preset primaries in the inline UI
+   b. Coolors handoff card (auto-surfaced after picks) — lock, spacebar shuffle, paste Export → URL
+7. Reflect back, persist, set introCompleted true, decision_note "Vibe set: …"
+8. Dashboard handoff — ready to see planning home?
+
+Hard rules:
+- Every turn MUST include a visible reply to Kelsie — never respond with tool calls alone
+- One forward question per turn (beat 4 may ask borrow and avoid together — that is one beat)
+- Briefly reflect what she just said before the next question — warm, not robotic
+- Never re-ask a beat she already answered in this thread
+- No tangents (ceremony setting, guest takeaway, etc.) unless she explicitly asks
+- If she pivots to planning, answer first — do not push the next beat that turn
+- If she says "skip" or "let's just plan", save partial vibe, set introCompleted true, do not block
+- Never store "copy Sarah's wedding" — store borrow/avoid/layout dimensions
+- Coolors URL paste auto-applies the palette — acknowledge and continue; do not call show_primary_color_picker again unless she restarts colors
+- Visual inspo screenshots belong in Visual Inspo Depot (/chat/inspiration), not the intro arc`;
+
 export function buildSystemPrompt(
   weddingData: WeddingState,
   vendorFocus?: VendorFocusContext,
-  zola?: ZolaPromptContext | null
+  zola?: ZolaPromptContext | null,
+  inspirationFocus?: InspirationFocusContext,
+  mainInspirationMemory?: string
 ): string {
   const stateBlock = `**Current wedding planning state**
 
@@ -167,14 +200,56 @@ ${JSON.stringify(weddingData, null, 2)}`;
     ? `\n\n${buildZolaBlock(zola, vendorFocus?.key === "caterer")}`
     : "";
 
+  const inspoDepotBlock =
+    mainInspirationMemory !== undefined
+      ? `\n\n**Visual inspo depot (internal — reference when suggesting venue, florist, or décor)**
+
+Rosie maintains running notes from screenshots Kelsie drops in Visual Inspo Depot. Use when relevant; do not recite the full log unprompted.
+
+${mainInspirationMemory.trim() ? mainInspirationMemory : "(empty — she has not shared visual inspo yet)"}`
+      : "";
+
+  if (inspirationFocus) {
+    return `${ROSIE_BASE_PROMPT}
+
+**You are in Visual Inspo Depot**
+
+This conversation is for Pinterest screenshots, mood board grabs, and venue or décor photos. Kelsie uploads images here over time. You describe what you see in plain language, then update your internal visual inspo memory via \`update_inspiration_memory\`.
+
+Rules:
+- Images are never stored — only your written observations persist
+- Do NOT infer or change her color palette; colors are set elsewhere
+- Do NOT copy observations into \`aesthetic.borrow\`, \`aesthetic.layout\`, or other vibe fields unless she explicitly asks you to update the vibe card
+- After she shares image(s), acknowledge warmly and call \`update_inspiration_memory\` with the full updated markdown
+- When she asks to summarize what she has shared, give her a readable summary drawn from your memory — warm prose, not raw markdown or bullet dumps
+- Cross-talk: if she mentions vendor facts worth tracking globally, still use \`update_wedding_data\`
+
+Keep your running memory current using exactly these headings:
+
+${INSPIRATION_MEMORY_TEMPLATE}
+
+This memory is internal by default. Summaries are the exception when she asks.
+
+**Internal visual inspo memory**
+
+${inspirationFocus.memory?.trim() ? inspirationFocus.memory : "(empty — encourage her to drop a screenshot or describe what she's drawn to)"}
+
+${stateBlock}${zolaBlock}`;
+  }
+
   if (!vendorFocus) {
+    const introBlock = !weddingData.aesthetic.introCompleted
+      ? `\n\n${INTRO_MODE_BLOCK}`
+      : "";
+
     return `${ROSIE_BASE_PROMPT}
 
 **Conversation focus**
 
 This is the main conversation with Kelsie. If the discussion narrows to one specific vendor and stays there for a few turns (comparing options, going through quotes, working out the details for that one vendor), gently offer once to continue in that vendor's dedicated focus — for example: "Want to pick this up in your florist focus?" Phrase it warmly, never as jargon, and never force it. If she agrees (or asks for the link), call \`suggest_vendor_focus\` with the vendor and a short reason; this surfaces a soft link for her. Don't suggest on the first mention, and don't suggest more than once for the same vendor in a row.
+${introBlock}
 
-${stateBlock}${zolaBlock}`;
+${stateBlock}${zolaBlock}${inspoDepotBlock}`;
   }
 
   return `${ROSIE_BASE_PROMPT}
@@ -345,9 +420,46 @@ const GET_ZOLA_SUMMARY_TOOL = {
   },
 };
 
-/** Tools available depend on whether we're in a vendor focus or the main chat. */
-export function getTools(vendorKey?: string | null) {
-  if (vendorKey) {
+const SHOW_PRIMARY_COLOR_PICKER_TOOL = {
+  name: "show_primary_color_picker",
+  description:
+    "Surface the inline primary color picker so Kelsie can choose two preset wedding colors before building a full palette in Coolors. Call during intro when vibe questions are answered and you are ready for color selection.",
+  input_schema: {
+    type: "object" as const,
+    properties: {
+      hint: {
+        type: "string",
+        description: "Optional one-line context shown above the picker.",
+      },
+    },
+  },
+};
+
+const UPDATE_INSPIRATION_MEMORY_TOOL = {
+  name: "update_inspiration_memory",
+  description:
+    "Replace the full Visual Inspo Depot internal markdown after Kelsie shares screenshots or discusses visual references. Use dated bullets under Observations. Never store images — text only.",
+  input_schema: {
+    type: "object" as const,
+    properties: {
+      markdown: {
+        type: "string",
+        description: "The complete updated visual inspo memory markdown.",
+      },
+    },
+    required: ["markdown"],
+  },
+};
+
+/** Tools available depend on conversation focus. */
+export function getTools(focus?: {
+  vendorKey?: string | null;
+  inspiration?: boolean;
+}) {
+  if (focus?.inspiration) {
+    return [...WEDDING_TOOLS, UPDATE_INSPIRATION_MEMORY_TOOL, GET_ZOLA_SUMMARY_TOOL];
+  }
+  if (focus?.vendorKey) {
     return [
       ...WEDDING_TOOLS,
       DRAFT_VENDOR_EMAIL_TOOL,
@@ -360,6 +472,7 @@ export function getTools(vendorKey?: string | null) {
     ...WEDDING_TOOLS,
     DRAFT_VENDOR_EMAIL_TOOL,
     SUGGEST_VENDOR_FOCUS_TOOL,
+    SHOW_PRIMARY_COLOR_PICKER_TOOL,
     GET_ZOLA_SUMMARY_TOOL,
   ];
 }

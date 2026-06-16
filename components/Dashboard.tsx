@@ -1,5 +1,6 @@
 import Link from "next/link";
 import type { WeddingState } from "@/lib/types";
+import { formatDecisionDateWithYear } from "@/lib/planning-utils";
 import { VENDOR_LABELS, isVendorKey } from "@/lib/vendors";
 
 const STATUS_STYLES: Record<string, string> = {
@@ -101,7 +102,7 @@ export default function Dashboard({ data }: DashboardProps) {
           )}
 
           <span className="block text-[11px] text-blush opacity-0 group-hover:opacity-100 transition-opacity pt-1">
-            Review budget with Rosie &rarr;
+            Review budget &rarr;
           </span>
         </Link>
       </section>
@@ -136,13 +137,13 @@ export default function Dashboard({ data }: DashboardProps) {
 
             {showVenueCta && (
               <p className="text-sm text-blush opacity-80 group-hover:opacity-100 transition-opacity">
-                Start your shortlist with Rosie &rarr;
+                Start your shortlist &rarr;
               </p>
             )}
 
             {!showVenueCta && data.venue.status !== "booked" && (
               <span className="block text-[11px] text-blush opacity-0 group-hover:opacity-100 transition-opacity">
-                Talk about venue with Rosie &rarr;
+                Talk about venue &rarr;
               </span>
             )}
 
@@ -292,14 +293,14 @@ export default function Dashboard({ data }: DashboardProps) {
                 className="group flex gap-4 items-start px-6 py-4 hover:bg-cream transition-colors"
               >
                 <span className="text-warm-light text-xs pt-0.5 shrink-0 tabular-nums">
-                  {d.date}
+                  {formatDecisionDateWithYear(d.date)}
                 </span>
                 <div className="flex-1 min-w-0">
                   <p className="text-warm-dark text-sm group-hover:text-blush transition-colors">
                     {d.decision}
                   </p>
                   <span className="text-[11px] text-blush opacity-0 group-hover:opacity-100 transition-opacity">
-                    Continue with Rosie &rarr;
+                    Continue &rarr;
                   </span>
                 </div>
               </Link>

@@ -44,6 +44,16 @@ ALTER TABLE vendor_memory ENABLE ROW LEVEL SECURITY;
 REVOKE ALL ON public.vendor_memory FROM anon, authenticated;
 GRANT SELECT, INSERT, UPDATE, DELETE ON public.vendor_memory TO service_role;
 
+-- Internal visual inspo notes (Rosie-maintained from screenshots; images never stored).
+CREATE TABLE IF NOT EXISTS inspiration_memory (
+  id int PRIMARY KEY DEFAULT 1,
+  markdown text NOT NULL DEFAULT '',
+  updated_at timestamptz DEFAULT now()
+);
+ALTER TABLE inspiration_memory ENABLE ROW LEVEL SECURITY;
+REVOKE ALL ON public.inspiration_memory FROM anon, authenticated;
+GRANT SELECT, INSERT, UPDATE, DELETE ON public.inspiration_memory TO service_role;
+
 -- Wedding planning state (single row, id always = 1)
 CREATE TABLE IF NOT EXISTS wedding_state (
   id int PRIMARY KEY DEFAULT 1,
@@ -86,10 +96,19 @@ VALUES (1, '{
   },
   "decisions": [],
   "aesthetic": {
-    "palette": ["pink", "green", "blue"],
-    "style": "elevated classic",
+    "palette": ["#c9a0a0", "#8faf8f", "#faf8f5", "#d4c4a8", "#6b6560"],
+    "style": null,
     "music": "DJ with potential live instrument",
-    "notes": []
+    "notes": [],
+    "borrow": [],
+    "avoid": [],
+    "layout": [],
+    "inspiration": {
+      "moment": null,
+      "structural": null
+    },
+    "introCompleted": false,
+    "themeApplied": false
   },
   "location": {
     "region": "southeast/central Texas",

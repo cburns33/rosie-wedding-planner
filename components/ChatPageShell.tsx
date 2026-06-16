@@ -2,7 +2,7 @@
 
 import Nav from "@/components/Nav";
 import ChatInterface from "@/components/ChatInterface";
-import type { Message } from "@/lib/types";
+import type { Message, PrimaryColorPicker } from "@/lib/types";
 
 interface VendorFocus {
   key: string;
@@ -10,18 +10,28 @@ interface VendorFocus {
   status: string;
 }
 
+interface InspirationFocus {
+  label: string;
+}
+
 interface ChatPageShellProps {
   initialMessages: Message[];
   threadKey?: string | null;
   vendorFocus?: VendorFocus;
+  inspirationFocus?: InspirationFocus;
   openingMessage?: string;
+  initialPrimaryColorPicker?: PrimaryColorPicker | null;
+  suggestedPrompts?: string[];
 }
 
 export default function ChatPageShell({
   initialMessages,
   threadKey = null,
   vendorFocus,
+  inspirationFocus,
   openingMessage,
+  initialPrimaryColorPicker = null,
+  suggestedPrompts = [],
 }: ChatPageShellProps) {
   return (
     <div className="flex flex-col h-full">
@@ -31,7 +41,10 @@ export default function ChatPageShell({
           initialMessages={initialMessages}
           threadKey={threadKey}
           vendorFocus={vendorFocus}
+          inspirationFocus={inspirationFocus}
           openingMessage={openingMessage}
+          initialPrimaryColorPicker={initialPrimaryColorPicker}
+          suggestedPrompts={suggestedPrompts}
         />
       </main>
     </div>

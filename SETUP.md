@@ -13,6 +13,7 @@ This guide covers first-time setup and where things live. Day-to-day, you mostly
 2. Go to **SQL Editor** and run the contents of `supabase/schema.sql`
 3. **Existing projects:** re-run only the migration blocks you are missing from `schema.sql`. **Run each block in full, including its `GRANT` / `REVOKE` lines.** Every table here is RLS-protected and reachable only via the `service_role` key; creating a table without its grants leaves server-side reads/writes failing with `permission denied`, and the failure can be silent.
    - **Core tables + grants** (bottom of file): the `GRANT SELECT, INSERT, UPDATE, DELETE ON public.wedding_state` and `... ON public.messages TO service_role` lines. Missing these means RSVP reconcile never lands in `wedding_state` and chat history never saves (this bit the live DB; fixed via a migration on 2026-06-12).
+   - **Visual Inspo Depot**: `inspiration_memory` table (single row, markdown only)
    - **Vendor focuses** (bottom of file): `messages.thread_key` + `vendor_memory` table. Chat will error without the `thread_key` column.
    - **Zola integration** (top of file): `zola_snapshots` table **and** its `service_role` grants. With the table but no grants, sync auth succeeds but inserts fail with permission denied.
 4. Grab credentials from **Settings → API**:
@@ -155,19 +156,32 @@ To verify, temporarily throw in an API route and check the Sentry Issues dashboa
 
 ### Planning home (`/`)
 
-The default landing page after sign-in. A wedding briefing, not a task board:
+The default landing page after sign-in. While the vibe intro is incomplete (`aesthetic.introCompleted === false`), **`/` redirects to `/chat`** so the intro sequence is first.
 
-- Weeks-to-go, **Up next** (one clear focus + link to chat or a vendor focus)
-- Progress milestones, summary cards (budget, vendors, latest decision)
-- **The details** — budget, venue, vendor list, decisions (most rows/cards link through to Rosie)
+After vibe intro completes, `/` shows the wedding briefing:
 
-Updates after chat without a manual reload: the home refetches `wedding_state` when you return to the tab or after Rosie saves changes.
+- Weeks-to-go, **Your vibe**, **Up next**, progress milestones, summary cards
+- **Welcome overlay** on first home visit only (after vibe intro, before `intro_completed`): trimmed copy, dismiss → scroll to Up next
+- **The details** — budget, venue, vendor list, decisions
+
+Updates after chat without a manual reload: refetch on tab focus and `wedding-state-updated`.
 
 ### Ask Rosie (`/chat`)
 
-Main conversation. Rosie holds full history for this thread (`thread_key = null`). First visit shows the signature intro animation; returning visits go straight to the thread.
+Main conversation (`thread_key = null`). **First-time landing:** Beat 1 opening message (`lib/intro.ts`), then Rosie-led vibe arc, inline **primary color picker** (pick 2), **Coolors handoff card** (5-color starter link), paste Coolors Export → URL to apply palette, optional image attach (paperclip, main thread only). Returning visits go straight to the thread when intro is complete.
+
+Assistant messages render **bold** and markdown links via `FormattedMessage`.
 
 When talk centers on one vendor, Rosie may offer to continue in **your [vendor] focus** — a soft link appears; she never auto-redirects.
+
+### QA / replay intro (local)
+
+```bash
+node scripts/reset-intro.mjs   # or run qa/reset-intro.sql in Supabase
+node scripts/seed-primary-picker.mjs   # optional: jump to primary color step only
+```
+
+See `qa/README.md` for the full first-visit flow and checklist.
 
 ### Vendor focuses (`/chat/[vendor]`)
 

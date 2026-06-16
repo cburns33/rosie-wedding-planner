@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { getSupabase } from "@/lib/supabase";
-import { DEFAULT_WEDDING_STATE } from "@/lib/wedding-defaults";
+import { mergeWeddingState } from "@/lib/wedding-defaults";
 import type { WeddingState } from "@/lib/types";
 
 export async function POST() {
@@ -11,10 +11,9 @@ export async function POST() {
       .eq("id", 1)
       .single();
 
-    const current: WeddingState = {
-      ...DEFAULT_WEDDING_STATE,
-      ...(data?.data as Partial<WeddingState>),
-    };
+    const current: WeddingState = mergeWeddingState(
+      data?.data as Partial<WeddingState> | undefined
+    );
 
     if (current.intro_completed) {
       return NextResponse.json({ ok: true });

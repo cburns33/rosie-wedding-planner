@@ -1,7 +1,7 @@
 import { notFound } from "next/navigation";
 import ChatPageShell from "@/components/ChatPageShell";
 import { getSupabase } from "@/lib/supabase";
-import { DEFAULT_WEDDING_STATE } from "@/lib/wedding-defaults";
+import { mergeWeddingState } from "@/lib/wedding-defaults";
 import { vendorOpeningMessage } from "@/lib/system-prompt";
 import {
   isVendorKey,
@@ -33,9 +33,9 @@ async function getWeddingData(): Promise<WeddingState> {
       .select("data")
       .eq("id", 1)
       .single();
-    return { ...DEFAULT_WEDDING_STATE, ...(data?.data as Partial<WeddingState>) };
+    return mergeWeddingState(data?.data as Partial<WeddingState> | undefined);
   } catch {
-    return DEFAULT_WEDDING_STATE;
+    return mergeWeddingState();
   }
 }
 

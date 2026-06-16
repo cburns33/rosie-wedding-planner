@@ -58,6 +58,42 @@ export function weeksToGo(state: WeddingState): number | null {
   return Math.round(ms / (1000 * 60 * 60 * 24 * 7));
 }
 
+function parseDecisionDate(date: string): Date | null {
+  const isoMatch = /^(\d{4})-(\d{2})-(\d{2})$/.exec(date.trim());
+  if (!isoMatch) return null;
+  const parsed = new Date(
+    Number(isoMatch[1]),
+    Number(isoMatch[2]) - 1,
+    Number(isoMatch[3])
+  );
+  return Number.isNaN(parsed.getTime()) ? null : parsed;
+}
+
+/** Decision log dates stored as YYYY-MM-DD, shown as "Jun 16". */
+export function formatDecisionDate(date: string): string {
+  const parsed = parseDecisionDate(date);
+  if (parsed) {
+    return parsed.toLocaleDateString("en-US", {
+      month: "short",
+      day: "numeric",
+    });
+  }
+  return date;
+}
+
+/** Decision log dates with year, shown as "Jun 16, 2026". */
+export function formatDecisionDateWithYear(date: string): string {
+  const parsed = parseDecisionDate(date);
+  if (parsed) {
+    return parsed.toLocaleDateString("en-US", {
+      month: "short",
+      day: "numeric",
+      year: "numeric",
+    });
+  }
+  return date;
+}
+
 /** Human label for the date line, falling back to the raw target phrase. */
 export function dateLabel(state: WeddingState): string {
   const { confirmedDate, targetDate } = state.timeline;
@@ -92,6 +128,12 @@ export interface UpNext {
  */
 export function getUpNext(state: WeddingState): UpNext {
   if (state.venue.status !== "booked") {
+    const layoutItems = (state.aesthetic.layout ?? []).slice(0, 2);
+    const layoutPhrase =
+      layoutItems.length > 0
+        ? layoutItems.join(" and ")
+        : null;
+
     if (state.venue.shortlist.length > 0) {
       return {
         title: "Choose your venue",
@@ -99,14 +141,24 @@ export function getUpNext(state: WeddingState): UpNext {
           state.venue.shortlist.length === 1 ? "" : "s"
         }. Rosie can help you decide.`,
         href: "/chat",
-        cta: "Compare venues with Rosie",
+        cta: "Compare venues",
       };
     }
+
+    if (layoutPhrase) {
+      return {
+        title: "Find your venue",
+        detail: `You mentioned ${layoutPhrase} — let's find venues that fit.`,
+        href: "/chat",
+        cta: "Talk about venue",
+      };
+    }
+
     return {
       title: "Find your venue",
       detail: "Everything else builds around this. Let's start the shortlist.",
       href: "/chat",
-      cta: "Talk about venue with Rosie",
+      cta: "Talk about venue",
     };
   }
 
@@ -171,8 +223,8 @@ function milestoneHref(label: string): string {
 function milestoneCta(label: string): string {
   if (label === "Vendors") return "See vendors";
   if (label === "Venue") return "Talk about venue";
-  if (label === "Foundations") return "Continue with Rosie";
-  return "Continue with Rosie";
+  if (label === "Foundations") return "Continue";
+  return "Continue";
 }
 
 /** Four-phase planning arc shown as a horizontal progress strip. */

@@ -45,6 +45,27 @@ export interface WeddingState {
     style: string | null;
     music: string | null;
     notes: string[];
+    borrow: string[];
+    avoid: string[];
+    layout: string[];
+    inspiration: {
+      moment: string | null;
+      /** Beat 2 — how she wants it to feel (raw; card uses summarized style). */
+      feeling: string | null;
+      structural: string | null;
+    };
+    introCompleted: boolean;
+    themeApplied: boolean;
+    /** Two hex primaries chosen before Coolors handoff. */
+    primaryPicks: string[];
+    /** Show inline primary picker until Kelsie confirms two colors. */
+    pendingPrimaryPicker: boolean;
+    /** Completed user answers in the intro arc (source of truth when messages do not persist). */
+    introUserTurns: number;
+    /** Beat 8 dashboard handoff still in progress after introCompleted. */
+    dashboardHandoffPending: boolean;
+    /** Beat 8 dashboard question already shown in chat. */
+    dashboardHandoffAsked: boolean;
   };
   location: {
     region: string | null;
@@ -96,6 +117,16 @@ export interface ZolaSnapshot {
     categoryCount: number;
   };
   syncedAt: string;
+}
+
+/** Inline primary color picker returned on the chat API response. */
+export interface PrimaryColorPicker {
+  hint?: string;
+}
+
+/** Coolors starter link surfaced after primary picks are confirmed. */
+export interface CoolorsHandoff {
+  url: string;
 }
 
 /** Ephemeral vendor email draft returned on the chat API response (not stored in DB). */

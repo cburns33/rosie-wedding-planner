@@ -38,10 +38,25 @@ export const DEFAULT_WEDDING_STATE: WeddingState = {
   },
   decisions: [],
   aesthetic: {
-    palette: ["pink", "green", "blue"],
-    style: "elevated classic",
+    palette: ["#c9a0a0", "#8faf8f", "#faf8f5", "#d4c4a8", "#6b6560"],
+    style: null,
     music: "DJ with potential live instrument",
     notes: [],
+    borrow: [],
+    avoid: [],
+    layout: [],
+    inspiration: {
+      moment: null,
+      feeling: null,
+      structural: null,
+    },
+    introCompleted: false,
+    themeApplied: false,
+    primaryPicks: [],
+    pendingPrimaryPicker: false,
+    introUserTurns: 0,
+    dashboardHandoffPending: false,
+    dashboardHandoffAsked: false,
   },
   location: {
     region: "southeast/central Texas",
@@ -58,3 +73,36 @@ export const DEFAULT_WEDDING_STATE: WeddingState = {
     },
   },
 };
+
+function asStringArray(value: unknown): string[] {
+  return Array.isArray(value) ? value.filter((item): item is string => typeof item === "string") : [];
+}
+
+/** Merge partial DB state with defaults (deep-merge aesthetic). */
+export function mergeWeddingState(partial?: Partial<WeddingState>): WeddingState {
+  const partialAesthetic = partial?.aesthetic ?? {};
+
+  return {
+    ...DEFAULT_WEDDING_STATE,
+    ...partial,
+    decisions: Array.isArray(partial?.decisions)
+      ? partial.decisions
+      : DEFAULT_WEDDING_STATE.decisions,
+    aesthetic: {
+      ...DEFAULT_WEDDING_STATE.aesthetic,
+      ...partialAesthetic,
+      palette: asStringArray(partialAesthetic.palette).length
+        ? asStringArray(partialAesthetic.palette)
+        : DEFAULT_WEDDING_STATE.aesthetic.palette,
+      borrow: asStringArray(partialAesthetic.borrow),
+      avoid: asStringArray(partialAesthetic.avoid),
+      layout: asStringArray(partialAesthetic.layout),
+      notes: asStringArray(partialAesthetic.notes),
+      primaryPicks: asStringArray(partialAesthetic.primaryPicks),
+      inspiration: {
+        ...DEFAULT_WEDDING_STATE.aesthetic.inspiration,
+        ...(partialAesthetic.inspiration ?? {}),
+      },
+    },
+  };
+}

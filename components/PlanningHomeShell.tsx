@@ -1,16 +1,19 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import Nav from "./Nav";
 import PlanningHome from "./PlanningHome";
 import WelcomeOverlay from "./WelcomeOverlay";
 import { shouldShowWelcome } from "@/lib/intro";
+import type { InspirationCardSummary } from "@/lib/inspiration";
 import type { WeddingState } from "@/lib/types";
+import { mergeWeddingState } from "@/lib/wedding-defaults";
 import type { ZolaAggregates } from "@/lib/zola/normalize";
 
 interface PlanningHomeShellProps {
   initialData: WeddingState;
   initialZola?: ZolaAggregates | null;
+  initialInspirationSummary?: InspirationCardSummary;
 }
 
 /**
@@ -21,18 +24,39 @@ interface PlanningHomeShellProps {
 export default function PlanningHomeShell({
   initialData,
   initialZola = null,
+  initialInspirationSummary = { observationCount: 0, latestPreview: null },
 }: PlanningHomeShellProps) {
   const [data, setData] = useState(initialData);
   const [zola, setZola] = useState<ZolaAggregates | null>(initialZola);
+  const [inspirationSummary, setInspirationSummary] = useState(
+    initialInspirationSummary
+  );
   const [showWelcome, setShowWelcome] = useState(shouldShowWelcome(initialData));
   const [dismissingWelcome, setDismissingWelcome] = useState(false);
 
   const refetch = useCallback(async () => {
     try {
-      const res = await fetch("/api/wedding-state", { cache: "no-store" });
-      if (res.ok) setData(await res.json());
+      const res = await fetch("/api/wedding-state", {
+        cache: "no-store",
+        headers: { "Cache-Control": "no-cache" },
+      });
+      if (res.ok) {
+        setData(mergeWeddingState((await res.json()) as Partial<WeddingState>));
+      }
     } catch {
       // Keep showing the last good state on a transient failure.
+    }
+  }, []);
+
+  const refetchInspiration = useCallback(async () => {
+    try {
+      const res = await fetch("/api/inspiration-memory", {
+        cache: "no-store",
+        headers: { "Cache-Control": "no-cache" },
+      });
+      if (res.ok) setInspirationSummary(await res.json());
+    } catch {
+      // Keep showing the last good summary on a transient failure.
     }
   }, []);
 
@@ -45,28 +69,46 @@ export default function PlanningHomeShell({
     }
   }, []);
 
+  const refetchAll = useCallback(() => {
+    void refetch();
+    void refetchInspiration();
+    void refetchZola();
+  }, [refetch, refetchInspiration, refetchZola]);
+
+  const refetchAllTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const scheduleRefetchAll = useCallback(() => {
+    if (refetchAllTimerRef.current) clearTimeout(refetchAllTimerRef.current);
+    refetchAllTimerRef.current = setTimeout(() => {
+      refetchAllTimerRef.current = null;
+      refetchAll();
+    }, 300);
+  }, [refetchAll]);
+
+  useEffect(() => {
+    setShowWelcome(shouldShowWelcome(initialData));
+    refetchAll();
+    return () => {
+      if (refetchAllTimerRef.current) clearTimeout(refetchAllTimerRef.current);
+    };
+  }, [initialData, refetchAll]);
+
   useEffect(() => {
     const onVisible = () => {
-      if (document.visibilityState === "visible") {
-        refetch();
-        refetchZola();
-      }
+      if (document.visibilityState === "visible") scheduleRefetchAll();
     };
-    const onFocus = () => {
-      refetch();
-      refetchZola();
-    };
+    const onFocus = () => scheduleRefetchAll();
+    const onStateUpdated = () => scheduleRefetchAll();
     window.addEventListener("focus", onFocus);
-    window.addEventListener("wedding-state-updated", refetch);
+    window.addEventListener("wedding-state-updated", onStateUpdated);
     window.addEventListener("zola-snapshot-updated", refetchZola);
     document.addEventListener("visibilitychange", onVisible);
     return () => {
       window.removeEventListener("focus", onFocus);
-      window.removeEventListener("wedding-state-updated", refetch);
+      window.removeEventListener("wedding-state-updated", onStateUpdated);
       window.removeEventListener("zola-snapshot-updated", refetchZola);
       document.removeEventListener("visibilitychange", onVisible);
     };
-  }, [refetch, refetchZola]);
+  }, [scheduleRefetchAll, refetchZola]);
 
   async function handleWelcomeDismiss() {
     if (dismissingWelcome) return;
@@ -95,7 +137,11 @@ export default function PlanningHomeShell({
     <div className="flex flex-col min-h-full">
       <Nav />
       <main className="flex-1 pt-16 overflow-y-auto">
-        <PlanningHome data={data} zola={zola} />
+        <PlanningHome
+          data={data}
+          zola={zola}
+          inspirationSummary={inspirationSummary}
+        />
       </main>
       {showWelcome && (
         <WelcomeOverlay onDismiss={handleWelcomeDismiss} dismissing={dismissingWelcome} />

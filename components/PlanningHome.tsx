@@ -1,24 +1,19 @@
 import Link from "next/link";
 import type { WeddingState } from "@/lib/types";
 import type { ZolaAggregates } from "@/lib/zola/normalize";
+import type { InspirationCardSummary } from "@/lib/inspiration";
 import Dashboard from "./Dashboard";
 import ZolaGuestsCard from "./ZolaGuestsCard";
+import YourVibeCard from "./YourVibeCard";
 import {
   weeksToGo,
   dateLabel,
+  formatDecisionDate,
   getUpNext,
   getMilestones,
   getSummary,
   type Milestone,
 } from "@/lib/planning-utils";
-
-function formatCurrency(n: number) {
-  return new Intl.NumberFormat("en-US", {
-    style: "currency",
-    currency: "USD",
-    maximumFractionDigits: 0,
-  }).format(n);
-}
 
 function countdownLabel(weeks: number | null): string {
   if (weeks == null) return "Let's set your date";
@@ -44,17 +39,18 @@ const CARD_INTERACTIVE =
 interface PlanningHomeProps {
   data: WeddingState;
   zola?: ZolaAggregates | null;
+  inspirationSummary?: InspirationCardSummary;
 }
 
-export default function PlanningHome({ data, zola }: PlanningHomeProps) {
+export default function PlanningHome({
+  data,
+  zola,
+  inspirationSummary = { observationCount: 0, latestPreview: null },
+}: PlanningHomeProps) {
   const weeks = weeksToGo(data);
   const upNext = getUpNext(data);
   const milestones = getMilestones(data);
   const summary = getSummary(data);
-  const allocatedPct = Math.min(
-    (summary.allocated / data.budget.total) * 100,
-    100
-  );
 
   return (
     <>
@@ -75,6 +71,8 @@ export default function PlanningHome({ data, zola }: PlanningHomeProps) {
             {countdownLabel(weeks)}
           </p>
         </header>
+
+        <YourVibeCard aesthetic={data.aesthetic} />
 
         {/* Up next — entire card is the action */}
         <section
@@ -169,28 +167,7 @@ export default function PlanningHome({ data, zola }: PlanningHomeProps) {
           className="briefing-item grid grid-cols-1 sm:grid-cols-3 gap-4"
           style={{ animationDelay: "300ms" }}
         >
-          <SummaryCard
-            label="Budget left"
-            href="/chat"
-            footnote="Review with Rosie"
-          >
-            <span
-              className={`font-serif text-2xl tabular-nums ${
-                summary.remaining < 0 ? "text-blush" : "text-warm-dark"
-              }`}
-            >
-              {formatCurrency(summary.remaining)}
-            </span>
-            <span className="text-warm-light text-xs tabular-nums">
-              of {formatCurrency(data.budget.total)}
-            </span>
-            <div className="mt-2 h-1 bg-cream rounded-full overflow-hidden">
-              <div
-                className="h-full bg-blush rounded-full transition-[width] duration-500 ease-out"
-                style={{ width: `${allocatedPct}%` }}
-              />
-            </div>
-          </SummaryCard>
+          <VisualInspoDepotCard summary={inspirationSummary} />
 
           <SummaryCard
             label="Vendors booked"
@@ -216,7 +193,7 @@ export default function PlanningHome({ data, zola }: PlanningHomeProps) {
           <SummaryCard
             label="Latest decision"
             href="/chat"
-            footnote={summary.latestDecision ? "Continue with Rosie" : undefined}
+            footnote={summary.latestDecision ? "Continue" : undefined}
           >
             {summary.latestDecision ? (
               <>
@@ -224,7 +201,7 @@ export default function PlanningHome({ data, zola }: PlanningHomeProps) {
                   {summary.latestDecision.decision}
                 </span>
                 <span className="text-warm-light text-xs tabular-nums">
-                  {summary.latestDecision.date}
+                  {formatDecisionDate(summary.latestDecision.date)}
                 </span>
               </>
             ) : (
@@ -268,6 +245,44 @@ export default function PlanningHome({ data, zola }: PlanningHomeProps) {
         Ask Rosie
       </Link>
     </>
+  );
+}
+
+function VisualInspoDepotCard({ summary }: { summary: InspirationCardSummary }) {
+  const className =
+    "group card-interactive block rounded-2xl border border-sage/30 bg-sage-pale p-5 flex flex-col gap-1.5 min-h-[7rem] hover:border-sage/45";
+
+  return (
+    <Link href="/chat/inspiration" className={className}>
+      <span className="text-xs tracking-[0.15em] uppercase text-warm-light">
+        Visual Inspo Depot
+      </span>
+      <div className="flex flex-col gap-1 mt-auto">
+        {summary.observationCount > 0 ? (
+          <>
+            <span className="font-serif text-2xl text-warm-dark tabular-nums">
+              {summary.observationCount}
+              <span className="text-warm-light text-lg">
+                {" "}
+                {summary.observationCount === 1 ? "look" : "looks"}
+              </span>
+            </span>
+            {summary.latestPreview && (
+              <span className="text-warm-mid text-xs leading-snug line-clamp-2">
+                {summary.latestPreview}
+              </span>
+            )}
+          </>
+        ) : (
+          <span className="text-warm-mid text-sm leading-snug">
+            Drop Pinterest screenshots or mood board grabs anytime.
+          </span>
+        )}
+      </div>
+      <span className="text-[11px] text-blush opacity-0 group-hover:opacity-100 transition-opacity mt-1">
+        Show me what you&apos;ve liked lately &rarr;
+      </span>
+    </Link>
   );
 }
 

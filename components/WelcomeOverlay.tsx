@@ -26,8 +26,7 @@ export default function WelcomeOverlay({ onDismiss, dismissing }: WelcomeOverlay
             Your planning home
           </h2>
           <p className="text-sm text-warm-mid leading-relaxed text-pretty">
-            This page updates as you make decisions. Up next will point you to what
-            matters most right now. Ask Rosie whenever you want to talk things through.
+            This is your planning home. Up next shows where to focus. Ask Rosie when you want to talk things through.
           </p>
         </div>
 

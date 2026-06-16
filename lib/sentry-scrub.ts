@@ -1,7 +1,7 @@
 import type { ErrorEvent } from "@sentry/nextjs";
 
 const SENSITIVE_KEY =
-  /message|content|prompt|body|chat|vendor|wedding|anthropic|zola|token|snapshot|guest|rsvp|registry/i;
+  /message|content|prompt|body|chat|vendor|wedding|anthropic|zola|token|snapshot|guest|rsvp|registry|image|base64|palette/i;
 
 /** Strip wedding/chat/integration payload data before events leave the app. */
 export function scrubSentryEvent(event: ErrorEvent): ErrorEvent {
@@ -9,6 +9,7 @@ export function scrubSentryEvent(event: ErrorEvent): ErrorEvent {
 
   if (
     url.includes("/api/chat") ||
+    url.includes("/api/chat/upload") ||
     url.includes("/api/wedding-state") ||
     url.includes("/api/integrations/") ||
     url.includes("/api/cron/")
