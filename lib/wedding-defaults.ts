@@ -80,7 +80,7 @@ function asStringArray(value: unknown): string[] {
 
 /** Merge partial DB state with defaults (deep-merge aesthetic). */
 export function mergeWeddingState(partial?: Partial<WeddingState>): WeddingState {
-  const partialAesthetic = partial?.aesthetic ?? {};
+  const partialAesthetic: Partial<WeddingState["aesthetic"]> = partial?.aesthetic ?? {};
 
   return {
     ...DEFAULT_WEDDING_STATE,
