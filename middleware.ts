@@ -3,7 +3,7 @@ import { NextResponse, type NextRequest } from "next/server";
 import { getSupabaseAuthConfig } from "@/lib/supabase-env";
 import { isEmailAllowed } from "@/lib/auth";
 
-const PUBLIC_PATHS = ["/login", "/auth/callback"];
+const PUBLIC_PATHS = ["/login", "/auth/callback", "/mockups"];
 
 // Chase-only integration routes that self-protect with CRON_SECRET (Bearer
 // token). They must skip magic-link auth so Vercel Cron and manual server

@@ -125,6 +125,73 @@ body {
   }
 }
 
+/* Handwriting reveal (intro mockups) — filled glyph fade for font-outline paths */
+@keyframes handwritingGlyphIn {
+  from {
+    opacity: 0;
+    transform: scale(0.97);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+.handwriting-glyph {
+  opacity: 0;
+  transform-box: fill-box;
+  transform-origin: center;
+  animation-name: handwritingGlyphIn;
+  animation-timing-function: cubic-bezier(0.25, 0.46, 0.45, 0.94);
+  animation-fill-mode: forwards;
+}
+
+.handwriting-glyph-static {
+  opacity: 1;
+}
+
+@keyframes mockupFadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.mockup-fade-in {
+  opacity: 0;
+  animation: mockupFadeIn 0.8s cubic-bezier(0.25, 0.46, 0.45, 0.94) forwards;
+}
+
+@keyframes mockupWashIn {
+  from {
+    opacity: 0;
+    transform: scale(0.92);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+.mockup-wash-in {
+  opacity: 0;
+  animation: mockupWashIn 1.2s ease-out forwards;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .handwriting-glyph,
+  .mockup-fade-in,
+  .mockup-wash-in {
+    animation: none;
+    opacity: 1;
+    transform: none;
+  }
+}
+
 
 /* Chat message prose — minimal, warm */
 .message-prose p {
