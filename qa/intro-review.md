@@ -20,8 +20,8 @@
 - [ ] Palette picker appears (lock, shuffle, Use this palette, Open in Coolors) — see STEP-14
 - [x] Accents change after palette confirm (`themeApplied: true`; visual change subtle)
 - [x] After intro completes, `/` loads planning home
-- [ ] Welcome overlay on home (trimmed copy, Let's go) — only after vibe intro done
-- [ ] Dismiss overlay scrolls to Up next; overlay does not reappear on reload
+- [ ] Welcome overlay on home (trimmed copy, Let's go) — only after vibe intro done → **fixed STEP-06; re-QA on full happy path**
+- [ ] Dismiss overlay scrolls to Up next; overlay does not reappear on reload → **fixed STEP-06; verified dismiss + reload**
 - [x] Home: Your vibe card (categorized sections: headline, moment, inspired by, details, swatches, skipping)
 - [ ] Home: Latest decision mentions vibe — re-test after STEP-05 fix
 - [x] Up next references layout inspo when venue not booked
@@ -89,11 +89,12 @@ Actual: `decisions: []`. Home shows "Nothing decided yet — ask Rosie where to 
 Screenshot: n/a
 
 [STEP-06] Welcome overlay skipped on happy-path first home visit  
-Severity: major  
+Severity: major → **fixed (2026-06-16)**  
 Area: home  
 Steps: After full intro, navigated to `/` for first time.  
 Expected: Overlay when `intro_completed === false` && `aesthetic.introCompleted === true`.  
 Actual: No overlay. API showed `intro_completed: true` without user clicking Let's go. Overlay works when flags are correct (verified in E1 skip path). Likely cause: unrestricted `update_wedding_data` path allows LLM to set `intro_completed` during chat (PRD: chat must not set this flag).  
+**Resolution:** `isProtectedFromChatWeddingDataPath()` blocks `intro_completed` in `applyWeddingDataUpdate()`; only `POST /api/wedding-state/complete-intro` may set the flag. Tool schema notes the restriction.  
 Screenshot: n/a
 
 [STEP-07] Palette picker ephemeral — disappears on next user message  
@@ -209,7 +210,7 @@ Rosie went off-script during QA (see STEP-01): clarifying follow-ups, tangents (
 | Aesthetic capture | `style` (feeling label), `borrow`, `avoid`, `inspiration.*` populated after scripted intro ✓ (re-verify on fresh reset) |
 | After palette confirm | `themeApplied === true`, 5 hex values ✓ |
 | Messages persisted | Reset reports 0 cleared; persistence unclear |
-| Overlay flag | Happy path: `intro_completed` true without overlay dismiss ✗ (STEP-06). Skip path: false until Let's go ✓ |
+| Overlay flag | Happy path: guard shipped (STEP-06); dismiss + reload verified on simulated post-intro state ✓ |
 | Latest decision | Server-side vibe decision append shipped (STEP-05); re-QA on fresh reset |
 
 ---
@@ -223,7 +224,7 @@ None (foundational checks passed: server up, reset works, redirect, Beat 1, chat
 1. **Palette ghost reference** — Rosie promises a palette in text but UI often empty; chat confirm destroys ephemeral picker (STEP-14) — *may be stale after primary-picker redesign; re-test*
 2. ~~Intro arc too long~~ — fixed (STEP-01); re-QA edge cases
 3. ~~`style`, `borrow` on Your vibe~~ — fixed (STEP-03, 04); ~~**`decision_note`**~~ fixed (STEP-05); re-QA on fresh reset
-4. Welcome overlay skipped on happy path — `intro_completed` set outside overlay dismiss (STEP-06)
+4. ~~Welcome overlay skipped on happy path~~ — fixed (STEP-06); re-QA full happy path after intro chat
 5. E1 skip: no Rosie reply to venue question; intro still completes (STEP-08)
 6. E5 Coolors URL does not surface palette picker (STEP-10) — *Coolors URL auto-apply may cover this; re-test paste path*
 
@@ -237,8 +238,8 @@ None (foundational checks passed: server up, reset works, redirect, Beat 1, chat
 
 ### PRD / shipped behavior gaps
 - Beat structure enforced server-side for beats 2–5a; skip/pivot paths still need QA (E1–E3)
-- Feedback loop: Your vibe ✓; Latest decision fixed server-side (STEP-05; re-QA); **welcome overlay still skipped on happy path** (STEP-06)
-- `intro_completed` must not be set from chat (flag may be set via unrestricted tool path) (STEP-06)
+- Feedback loop: Your vibe ✓; Latest decision fixed server-side (STEP-05; re-QA); **welcome overlay guard shipped** (STEP-06; re-QA full happy path)
+- ~~`intro_completed` must not be set from chat~~ — fixed (STEP-06)
 - Coolors URL paste should trigger apply flow (re-test STEP-10)
 - E2, E3, E4, E6, E7, E10 not executed in this pass
 

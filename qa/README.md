@@ -4,7 +4,7 @@ Reference spec: [`prd/intro-aesthetic-build-prompt.md`](../prd/intro-aesthetic-b
 
 Working review file: [`qa/intro-review.md`](./intro-review.md)
 
-**QA agent prompt:** [`qa/intro-qa-prompt.md`](./intro-qa-prompt.md)
+**QA agent prompt:** [`qa/intro-qa-prompt.md`](./intro-qa-prompt.md) — use **lean pass** for routine regression (API-first, 8 browser checkpoints); **full pass** for milestone sign-off.
 
 ## Environment
 

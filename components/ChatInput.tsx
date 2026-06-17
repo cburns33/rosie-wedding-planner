@@ -24,8 +24,17 @@ export default function ChatInput({ onSend, disabled, allowImages = false }: Cha
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const fileRef = useRef<HTMLInputElement>(null);
 
+  function readValue(): string {
+    return textareaRef.current?.value ?? value;
+  }
+
+  function syncValueFromTextarea() {
+    const next = textareaRef.current?.value ?? "";
+    if (next !== value) setValue(next);
+  }
+
   function handleSend() {
-    const trimmed = value.trim();
+    const trimmed = readValue().trim();
     const hasImages = allowImages && images.length > 0;
     if ((!trimmed && !hasImages) || disabled) return;
     onSend(
@@ -35,6 +44,7 @@ export default function ChatInput({ onSend, disabled, allowImages = false }: Cha
     setValue("");
     setImages([]);
     if (textareaRef.current) {
+      textareaRef.current.value = "";
       textareaRef.current.style.height = "auto";
     }
   }
@@ -49,8 +59,13 @@ export default function ChatInput({ onSend, disabled, allowImages = false }: Cha
   function handleInput() {
     const el = textareaRef.current;
     if (!el) return;
+    setValue(el.value);
     el.style.height = "auto";
     el.style.height = `${Math.min(el.scrollHeight, 160)}px`;
+  }
+
+  function handleFocus() {
+    syncValueFromTextarea();
   }
 
   async function handleFileChange(e: ChangeEvent<HTMLInputElement>) {
@@ -81,7 +96,8 @@ export default function ChatInput({ onSend, disabled, allowImages = false }: Cha
   }
 
   const canSend =
-    (value.trim().length > 0 || (allowImages && images.length > 0)) && !disabled;
+    (readValue().trim().length > 0 || (allowImages && images.length > 0)) &&
+    !disabled;
 
   return (
     <div className="border-t border-border bg-cream px-6 py-4">
@@ -94,16 +110,18 @@ export default function ChatInput({ onSend, disabled, allowImages = false }: Cha
                 <img
                   src={img.preview}
                   alt="Attachment preview"
-                  className="w-14 h-14 rounded-lg object-cover border border-border"
+                  className="w-14 h-14 rounded-lg object-cover outline outline-1 outline-black/10"
                 />
                 <button
                   type="button"
                   onClick={() => removeImage(img.id)}
                   disabled={disabled}
                   aria-label="Remove image"
-                  className="absolute -top-1.5 -right-1.5 w-5 h-5 rounded-full bg-warm-dark text-cream text-xs leading-none flex items-center justify-center hover:bg-blush"
+                  className="absolute -top-2 -right-2 min-h-10 min-w-10 flex items-center justify-center rounded-full hover:bg-blush/10 active:scale-[0.96] transition-transform duration-150 ease-out disabled:opacity-50"
                 >
-                  ×
+                  <span className="w-5 h-5 rounded-full bg-warm-dark text-cream text-xs leading-none flex items-center justify-center">
+                    ×
+                  </span>
                 </button>
               </div>
             ))}
@@ -127,7 +145,7 @@ export default function ChatInput({ onSend, disabled, allowImages = false }: Cha
                 onClick={() => fileRef.current?.click()}
                 disabled={disabled || images.length >= MAX_FILES}
                 aria-label="Attach inspiration image"
-                className="shrink-0 h-12 w-12 flex items-center justify-center rounded-xl border border-border bg-white text-warm-mid hover:border-blush/50 hover:text-blush disabled:opacity-30 transition-colors"
+                className="shrink-0 h-12 w-12 flex items-center justify-center rounded-xl border border-border bg-white text-warm-mid hover:border-blush/50 hover:text-blush disabled:opacity-30 active:scale-[0.96] transition-[transform,border-color,color] duration-150 ease-out"
               >
                 <svg
                   xmlns="http://www.w3.org/2000/svg"
@@ -154,6 +172,7 @@ export default function ChatInput({ onSend, disabled, allowImages = false }: Cha
             onChange={(e) => setValue(e.target.value)}
             onKeyDown={handleKeyDown}
             onInput={handleInput}
+            onFocus={handleFocus}
             disabled={disabled}
             placeholder="Say something…"
             rows={1}
@@ -161,9 +180,14 @@ export default function ChatInput({ onSend, disabled, allowImages = false }: Cha
             style={{ minHeight: "48px" }}
           />
           <button
+            type="button"
+            onMouseDown={syncValueFromTextarea}
             onClick={handleSend}
-            disabled={!canSend}
-            className="shrink-0 h-12 px-5 bg-warm-dark text-cream rounded-xl text-[13px] tracking-wide font-medium hover:bg-warm-mid disabled:opacity-30 disabled:cursor-not-allowed transition-all"
+            disabled={disabled}
+            aria-disabled={!canSend}
+            className={`shrink-0 h-12 px-5 bg-warm-dark text-cream rounded-xl text-[13px] tracking-wide font-medium hover:bg-warm-mid active:scale-[0.96] transition-[transform,background-color,opacity] duration-150 ease-out ${
+              canSend ? "" : "opacity-30 cursor-not-allowed"
+            } ${disabled ? "opacity-30 cursor-not-allowed" : ""}`}
           >
             Send
           </button>

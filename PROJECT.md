@@ -431,7 +431,7 @@ In `ROSIE_BASE_PROMPT` (`lib/system-prompt.ts`); all subject to change as Kelsie
 
 ## Known issues / things to be aware of
 
-- **Welcome overlay flag (STEP-06)** — `intro_completed` may be set from chat tools on the happy path instead of only via Let's go dismiss. Overlay works when flags are correct; guard the flag in the chat tool path.
+- **Welcome overlay flag (STEP-06)** — fixed: `isProtectedFromChatWeddingDataPath()` blocks `intro_completed` in chat `applyWeddingDataUpdate()`; only `POST /api/wedding-state/complete-intro` sets the flag.
 - **Inspo card empty with notes present** — `summarizeInspirationMemory()` only counts bullets matching `- (YYYY-MM-DD)`. Rosie must use that format under **Observations** or the home card stays empty.
 - **Message persistence (STEP-11)** — reset script often reports "Cleared 0 messages"; intro uses `introUserTurns` as fallback progress counter.
 - **Dev server hang (local)** — long-running `npm run dev` can stop responding (browser refresh appears to do nothing; requests time out). Fix: Ctrl+C and restart `npm run dev`. Home refetch is debounced to reduce load.

@@ -10,6 +10,7 @@ import {
 } from "@/lib/system-prompt";
 import { getLatestSnapshot, getZolaProfileUrl } from "@/lib/zola/store";
 import { mergeWeddingState } from "@/lib/wedding-defaults";
+import { isProtectedFromChatWeddingDataPath } from "@/lib/wedding-data-guard";
 import { deepSet } from "@/lib/deep-set";
 import {
   isVendorKey,
@@ -136,6 +137,10 @@ async function applyWeddingDataUpdate(
   value: unknown,
   decisionNote?: string
 ): Promise<void> {
+  if (isProtectedFromChatWeddingDataPath(path)) {
+    return;
+  }
+
   const current = await getWeddingData();
   let updated = deepSet(
     current as unknown as Record<string, unknown>,

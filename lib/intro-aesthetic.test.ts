@@ -2,6 +2,7 @@ import { describe, it, expect } from "vitest";
 import { getUpNext } from "@/lib/planning-utils";
 import { mergeWeddingState } from "@/lib/wedding-defaults";
 import { introOpeningMessage, shouldShowWelcome, shouldRedirectToIntroChat } from "@/lib/intro";
+import { isProtectedFromChatWeddingDataPath } from "@/lib/wedding-data-guard";
 import { extractCoolorsFromText } from "@/lib/colors/coolors";
 import { primaryColorLabel } from "@/lib/colors/primary-colors";
 import { paletteToThemeVars } from "@/lib/colors/theme";
@@ -64,6 +65,13 @@ describe("intro aesthetic integration", () => {
   it("mergeWeddingState defaults primary picker flags", () => {
     expect(mergeWeddingState().aesthetic.pendingPrimaryPicker).toBe(false);
     expect(mergeWeddingState().aesthetic.primaryPicks).toEqual([]);
+  });
+
+  it("blocks intro_completed from chat wedding data updates", () => {
+    expect(isProtectedFromChatWeddingDataPath("intro_completed")).toBe(true);
+    expect(isProtectedFromChatWeddingDataPath("aesthetic.introCompleted")).toBe(
+      false
+    );
   });
 
   it("primaryColorLabel resolves preset names", () => {

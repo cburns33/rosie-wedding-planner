@@ -42,7 +42,7 @@ export default function LoginForm({ error }: LoginFormProps) {
   return (
     <div className="w-full max-w-sm space-y-6">
       <div className="text-center space-y-2">
-        <h1 className="font-serif text-4xl font-light text-warm-dark">Rosie</h1>
+        <h1 className="font-serif text-4xl font-light text-warm-dark text-balance">Rosie</h1>
         <p className="text-warm-light text-sm">Sign in to continue planning</p>
       </div>
 
@@ -84,7 +84,7 @@ export default function LoginForm({ error }: LoginFormProps) {
           <button
             type="submit"
             disabled={status === "sending"}
-            className="w-full py-3 bg-blush text-white text-sm tracking-wide rounded-xl hover:bg-blush/90 transition-colors disabled:opacity-50"
+            className="w-full py-3 bg-blush text-white text-sm tracking-wide rounded-xl hover:bg-blush/90 active:scale-[0.96] transition-[transform,background-color] duration-150 ease-out disabled:opacity-50 disabled:active:scale-100"
           >
             {status === "sending" ? "Sending…" : "Send magic link"}
           </button>

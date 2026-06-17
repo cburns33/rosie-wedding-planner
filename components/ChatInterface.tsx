@@ -252,7 +252,7 @@ export default function ChatInterface({
                   type="button"
                   disabled={loading}
                   onClick={() => sendMessage(prompt)}
-                  className="inline-flex items-center rounded-full border border-sage/30 bg-sage-pale text-warm-dark text-xs px-3.5 py-2 hover:bg-sage-light active:scale-[0.98] transition-[transform,background-color] duration-150 ease-out disabled:opacity-50"
+                  className="inline-flex items-center rounded-full border border-sage/30 bg-sage-pale text-warm-dark text-xs px-3.5 py-2 min-h-10 hover:bg-sage-light active:scale-[0.96] transition-[transform,background-color] duration-150 ease-out disabled:opacity-50"
                 >
                   {prompt}
                 </button>
@@ -265,7 +265,7 @@ export default function ChatInterface({
               <span className="text-[11px] tracking-widest uppercase text-warm-light px-1">
                 Rosie
               </span>
-              <div className="bg-white border border-border rounded-2xl rounded-tl-sm px-5 py-4 shadow-sm">
+              <div className="bg-white border border-border rounded-2xl rounded-tl-sm px-5 py-4 shadow-[0_0_0_1px_rgba(44,40,37,0.04),0_2px_8px_rgba(44,40,37,0.05)]">
                 <TypingIndicator />
               </div>
             </div>

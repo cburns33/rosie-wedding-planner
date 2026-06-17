@@ -33,7 +33,7 @@ export default function PrimaryColorPickerCard({
 
   return (
     <div className="flex justify-start w-full">
-      <div className="w-full max-w-[85%] rounded-2xl border border-border bg-white shadow-sm overflow-hidden">
+      <div className="w-full max-w-[85%] rounded-[20px] border border-border bg-white shadow-[0_0_0_1px_rgba(44,40,37,0.04),0_4px_16px_rgba(44,40,37,0.06)] overflow-hidden">
         <div className="px-5 py-3 border-b border-border bg-cream/60">
           <p className="text-[11px] tracking-widest uppercase text-warm-light">
             Primary colors
@@ -62,7 +62,7 @@ export default function PrimaryColorPickerCard({
                   }`}
                 >
                   <span
-                    className="w-full h-10 rounded-lg border border-black/10"
+                    className="w-full h-10 rounded border border-black/10"
                     style={{ backgroundColor: color.hex }}
                   />
                   <span className="text-xs text-warm-dark">{color.name}</span>

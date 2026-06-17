@@ -12,7 +12,7 @@ export default function MessageBubble({ role, content }: MessageBubbleProps) {
         <span className="text-[11px] tracking-widest uppercase text-warm-light px-1">
           Rosie
         </span>
-        <div className="bg-white border border-border rounded-2xl rounded-tl-sm px-5 py-4 text-[15px] text-warm-dark shadow-sm">
+        <div className="bg-white border border-border rounded-2xl rounded-tl-sm px-5 py-4 text-[15px] text-warm-dark shadow-[0_0_0_1px_rgba(44,40,37,0.04),0_2px_8px_rgba(44,40,37,0.05)]">
           <FormattedMessage content={content} />
         </div>
       </div>

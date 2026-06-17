@@ -284,7 +284,7 @@ export const WEDDING_TOOLS = [
         path: {
           type: "string",
           description:
-            "Dot-notation path to the field to update. Examples: 'venue.status', 'vendors.photographer.name', 'vendors.photographer.contact', 'vendors.photographer.quoted_cost', 'vendors.photographer.booked_cost', 'budget.allocations.venue', 'location.decided', 'venue.shortlist', 'timeline.confirmedDate'",
+            "Dot-notation path to the field to update. Examples: 'venue.status', 'vendors.photographer.name', 'vendors.photographer.contact', 'vendors.photographer.quoted_cost', 'vendors.photographer.booked_cost', 'budget.allocations.venue', 'location.decided', 'venue.shortlist', 'timeline.confirmedDate'. Do not use 'intro_completed' (home welcome overlay only).",
         },
         value: {
           description:

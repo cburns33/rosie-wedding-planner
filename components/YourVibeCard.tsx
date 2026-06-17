@@ -88,7 +88,7 @@ export default function YourVibeCard({ aesthetic }: YourVibeCardProps) {
             {swatches.map((color, i) => (
               <span
                 key={i}
-                className="w-8 h-8 rounded-full border border-border shrink-0"
+                className="w-8 h-8 rounded-full shrink-0 outline outline-1 outline-black/10"
                 style={{ backgroundColor: color }}
                 aria-label={`Palette color ${i + 1}`}
               />
