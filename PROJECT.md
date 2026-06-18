@@ -86,7 +86,7 @@ Chat data uses the service role key server-side. Auth uses the publishable key +
 | `/chat` | **Ask Rosie** — main conversation (`thread_key = null`) |
 | `/chat/inspiration` | **Visual Inspo Depot** — screenshot/mood-board chat (`thread_key = inspiration`) |
 | `/chat/[vendor]` | **Vendor focus** — scoped chat for one of nine vendors (e.g. `/chat/caterer`) |
-| `/how-it-works` | **How This Works** — static guide to app capabilities |
+| `/how-it-works` | **How This Works** — timeline guide to app capabilities (static, no auth/state fetch; themed via `ThemeProvider`) |
 | `/dashboard` | Redirects to `/` (legacy bookmark) |
 | `/login` | Magic-link sign-in |
 | `/api/chat` | Chat POST (Anthropic + tools) |
@@ -97,7 +97,7 @@ Chat data uses the service role key server-side. Auth uses the publishable key +
 | `/api/integrations/zola/import` | POST CSV fallback import (Chase; `CRON_SECRET`; not in UI) |
 | `/api/cron/zola-sync` | GET scheduled Zola sync (Vercel Cron; `CRON_SECRET`) |
 
-Nav: **Home** · **Ask Rosie** · Sign out. Rosie wordmark → `/`.
+Nav: **Home** · **How This Works** · **Ask Rosie** · Sign out. Rosie wordmark → `/`.
 
 ---
 
@@ -256,7 +256,7 @@ Two independent flags:
 
 **Landing (as shipped):** `/` redirects to `/chat` until `aesthetic.introCompleted === true`. The vibe intro is the first experience, not something Kelsie navigates to from home.
 
-**Chat intro** (`lib/intro.ts` → `introOpeningMessage()`): Beat 1 is scripted when the main thread is empty and vibe intro is incomplete. Beats 2–5a are server-scripted (`lib/intro-beats.ts`, `lib/intro-script.ts`) with `introUserTurns` progress; answers persist to `inspiration.*`, `borrow`, `avoid`, and finalized display fields via `lib/vibe-display.ts`. Rosie surfaces `PrimaryColorPickerCard` via `show_primary_color_picker`, then a `CoolorsHandoffCard` (5-color starter link to coolors.co). Kelsie builds the full palette in Coolors (lock + spacebar shuffle), pastes Export → URL back in chat; the chat route parses and applies via `applyPaletteToWeddingState()`. Beat 7 reflects and finalizes vibe; beat 8 asks "ready to see your planning dashboard now?" and redirects to `/` on yes (`redirectTo` in chat API). Ongoing screenshots belong in **Visual Inspo Depot** (`/chat/inspiration`), not the intro arc. Image attach on main `/chat` and inspo focus only (base64 in chat POST; inspo images are not stored).
+**Chat intro** (`lib/intro.ts` → `introOpeningMessage()`): Beat 1 is scripted when the main thread is empty and vibe intro is incomplete. Beats 2–5a are server-scripted (`lib/intro-beats.ts`, `lib/intro-script.ts`) with `introUserTurns` progress; answers persist to `inspiration.*`, `borrow`, `avoid`, and finalized display fields via `lib/vibe-display.ts`. Rosie surfaces `PrimaryColorPickerCard` via `show_primary_color_picker`, then a `CoolorsHandoffCard` (5-color starter link to coolors.co). Kelsie builds the full palette in Coolors (lock + spacebar shuffle), pastes Export → URL back in chat; the chat route parses and applies via `applyPaletteToWeddingState()`. Beat 7 reflects and finalizes vibe; beat 8 asks "ready to see your planning dashboard now?" (also mentions How This Works in the menu) and redirects to `/` on yes (`redirectTo` in chat API). Ongoing screenshots belong in **Visual Inspo Depot** (`/chat/inspiration`), not the intro arc. Image attach on main `/chat` and inspo focus only (base64 in chat POST; inspo images are not stored).
 
 **Home welcome overlay:** after vibe intro completes, first visit to `/` may show trimmed `WelcomeOverlay` if `intro_completed === false`. Dismiss sets the flag via `POST /api/wedding-state/complete-intro` and scrolls to Up next.
 
@@ -265,6 +265,16 @@ Two independent flags:
 **Replay intro:** `node scripts/reset-intro.mjs` or `qa/reset-intro.sql` (clears main-thread messages + intro/aesthetic flags). **Backfill vibe display fields:** `node scripts/backfill-vibe-display.mjs`. **Skip to color step (local QA):** `node scripts/seed-primary-picker.mjs`.
 
 Vendor focuses use `vendorOpeningMessage()` on first open; no aesthetic intro rerun or image attach.
+
+### How This Works (`/how-it-works`)
+
+Static guide page — `GuidePageTimeline.tsx` renders `GUIDE_SECTIONS` from `lib/guide-content.ts` as a vertical timeline. No `wedding_state` fetch or auth-dependent data; accessible during the intro arc (linked in beat 8 dashboard handoff copy). Section content is defined entirely in `guide-content.ts`.
+
+- **Layout**: alternating card/open treatments — odd-indexed sections get rounded gradient cards (`blush` or `sage` for Zola), even-indexed sections are open (cream bg, spine visible).
+- **Spine**: absolute-positioned track (`bg-border`) + fill (`bg-blush`, `scaleY` driven by scroll progress). Step circles (`size-11`) straddle section boundaries.
+- **Z-index**: spine z-0 → open section `bg-cream` content mask → card (opaque gradient) → circles `z-10` → nav `z-20`.
+- **Reveals**: `IntersectionObserver` adds `.is-revealed` to `[data-reveal]` elements; CSS transitions handle the rest. Spine fill and IO are both skipped when `prefers-reduced-motion: reduce`.
+- **Theming**: all color classes (`bg-blush-pale`, `from-blush-pale`, etc.) reference CSS custom properties overridden by `ThemeProvider` on the root layout, so guide colors automatically reflect the user's selected palette.
 
 ### Auth (`middleware.ts`)
 
@@ -295,8 +305,9 @@ Rosie pulls live RSVP + registry aggregates from the couple's Zola account so th
 ```
 app/
   layout.tsx                  fonts + metadata
-  globals.css                 theme, intro/briefing animations, .card-interactive
+  globals.css                 theme, intro/briefing animations, .card-interactive, [data-reveal] timeline scroll reveals
   page.tsx                    planning home (redirects to /chat until vibe intro done)
+  how-it-works/page.tsx       How This Works timeline guide (static, no auth fetch)
   chat/page.tsx               main Ask Rosie chat
   chat/inspiration/page.tsx   Visual Inspo Depot chat
   chat/[vendor]/page.tsx      vendor focus chat
@@ -321,7 +332,7 @@ sentry.edge.config.ts           Sentry Edge init
 lib/sentry-scrub.ts             strip chat payloads before Sentry upload
 
 components/
-  Nav.tsx                     Home | Ask Rosie | Sign out
+  Nav.tsx                     Home | How This Works | Ask Rosie | Sign out
   PlanningHome.tsx            briefing layout (hero, your vibe, up next, progress, summaries)
   PlanningHomeShell.tsx       client refetch wrapper + welcome overlay
   WelcomeOverlay.tsx          first-visit home onboarding card
@@ -337,6 +348,10 @@ components/
   VendorEmailDraftCard.tsx    inline vendor email draft (Copy / Open in email)
   MessageBubble.tsx           wraps FormattedMessage for assistant text
   ChatInput.tsx
+  GuideBulletList.tsx         numbered/flower/dash bullet list for guide page
+  GuideFlowerBullet.tsx       inline flower SVG icon (fill=currentColor)
+  GuidePage.tsx               original static guide layout (unused; superseded by timeline)
+  GuidePageTimeline.tsx       Homestack-inspired timeline guide — spine fill, gradient cards, IO reveals
 
 lib/
   types.ts                    WeddingState, Message (+ thread_key), VendorMemory
@@ -347,6 +362,7 @@ lib/
   intro.ts                    shouldShowWelcome(), shouldRedirectToIntroChat(), introOpeningMessage()
   intro-beats.ts              intro beat resolution, skip/pivot detection
   intro-script.ts             scripted Rosie copy for beats 2–5a
+  guide-content.ts            GUIDE_SECTIONS data for How This Works page
   vibe-display.ts             Your vibe card copy (quoted excerpts, chips, finalize, vibe decision)
   inspiration.ts              inspo thread key, memory CRUD, home card summary
   chat-thread.ts              parse threadKey (vendor vs inspiration vs main)
@@ -365,6 +381,9 @@ lib/
     store.ts                  zola_snapshots read/write + profile URL
     parse-csv.ts              CSV fallback parser (Chase only)
     cron-auth.ts              CRON_SECRET bearer check
+
+assets/
+  guide-flower.svg            flower bullet source SVG (inlined in GuideFlowerBullet.tsx)
 
 vitest.config.ts              Vitest config (Node env, tsconfig path aliases)
 
