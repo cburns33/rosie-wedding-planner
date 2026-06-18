@@ -277,7 +277,7 @@ const TEXT_ONLY_NUDGE =
   "[System: Send your visible reply to Kelsie now. No tool calls on this turn.]";
 
 const DASHBOARD_HANDOFF_QUESTION =
-  "Great — ready to see your planning dashboard now?";
+  "Great — ready to see your planning dashboard now? You'll also find How This Works in the menu anytime you want the full walkthrough.";
 
 async function handleDashboardHandoffTurn(params: {
   resolution: IntroBeatResolution;

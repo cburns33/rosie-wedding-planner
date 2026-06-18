@@ -232,7 +232,7 @@ Do NOT mention the planning dashboard yet (beat 8 handles that). Do NOT re-ask a
   "8": `**Intro beat 8 — dashboard handoff (this turn only)**
 
 The vibe intro is saved. Your job this turn:
-1. If Kelsie has not yet been asked, say: "Great — ready to see your planning dashboard now?"
+1. If Kelsie has not yet been asked, say: "Great — ready to see your planning dashboard now? You'll also find How This Works in the menu anytime you want the full walkthrough."
 2. If she confirms yes, acknowledge briefly — the app will navigate her to home.
 
 Do NOT re-ask vibe questions. Do NOT call tools unless she asks to change saved vibe fields.`,

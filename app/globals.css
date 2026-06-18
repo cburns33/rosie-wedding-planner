@@ -193,6 +193,28 @@ body {
 }
 
 
+/* Timeline page — IntersectionObserver scroll reveals (Tier 1: opacity + translateY only) */
+[data-reveal] {
+  opacity: 0;
+  transform: translateY(18px);
+  transition-property: opacity, transform;
+  transition-duration: 0.55s;
+  transition-timing-function: cubic-bezier(0.25, 0.46, 0.45, 0.94);
+}
+
+[data-reveal].is-revealed {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  [data-reveal] {
+    opacity: 1;
+    transform: none;
+    transition: none;
+  }
+}
+
 /* Chat message prose — minimal, warm */
 .message-prose p {
   margin: 0 0 0.75em;

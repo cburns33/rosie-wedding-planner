@@ -86,6 +86,7 @@ Chat data uses the service role key server-side. Auth uses the publishable key +
 | `/chat` | **Ask Rosie** — main conversation (`thread_key = null`) |
 | `/chat/inspiration` | **Visual Inspo Depot** — screenshot/mood-board chat (`thread_key = inspiration`) |
 | `/chat/[vendor]` | **Vendor focus** — scoped chat for one of nine vendors (e.g. `/chat/caterer`) |
+| `/how-it-works` | **How This Works** — static guide to app capabilities |
 | `/dashboard` | Redirects to `/` (legacy bookmark) |
 | `/login` | Magic-link sign-in |
 | `/api/chat` | Chat POST (Anthropic + tools) |

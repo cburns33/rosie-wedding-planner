@@ -16,7 +16,7 @@ export default function Nav() {
   }
 
   return (
-    <nav className="fixed top-0 left-0 right-0 z-10 flex items-center justify-between px-8 h-16 bg-cream border-b border-border">
+    <nav className="fixed top-0 left-0 right-0 z-20 flex items-center justify-between px-8 h-16 bg-cream border-b border-border">
       <Link
         href="/"
         className="font-serif text-2xl font-light tracking-wide text-warm-dark hover:text-blush transition-colors"
@@ -34,6 +34,16 @@ export default function Nav() {
           }`}
         >
           Home
+        </Link>
+        <Link
+          href="/how-it-works"
+          className={`inline-flex items-center h-10 px-1 text-xs tracking-widest uppercase transition-colors ${
+            pathname === "/how-it-works"
+              ? "text-warm-dark"
+              : "text-warm-light hover:text-warm-mid"
+          }`}
+        >
+          How This Works
         </Link>
         <Link
           href="/chat"
