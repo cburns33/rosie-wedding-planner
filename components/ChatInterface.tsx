@@ -171,12 +171,25 @@ export default function ChatInterface({
         ]);
         return;
       }
-      if (data.message?.trim()) {
-        setMessages((prev) => [...prev, { role: "assistant", content: data.message }]);
-        if (data.suggestFocus) setSuggestedFocus(data.suggestFocus);
-        if (data.emailDraft) setEmailDraft(data.emailDraft);
-        if (data.primaryColorPicker) setPrimaryColorPicker(data.primaryColorPicker);
-        if (data.coolorsHandoff) setCoolorsHandoff(data.coolorsHandoff);
+      const replyMessage =
+        typeof data.message === "string" ? data.message.trim() : "";
+      if (replyMessage) {
+        setMessages((prev) => [...prev, { role: "assistant", content: replyMessage }]);
+        if (
+          data.suggestFocus &&
+          typeof data.suggestFocus === "object" &&
+          "vendor" in data.suggestFocus &&
+          "label" in data.suggestFocus
+        ) {
+          setSuggestedFocus(data.suggestFocus as { vendor: string; label: string });
+        }
+        if (data.emailDraft) setEmailDraft(data.emailDraft as EmailDraft);
+        if (data.primaryColorPicker) {
+          setPrimaryColorPicker(data.primaryColorPicker as PrimaryColorPicker);
+        }
+        if (data.coolorsHandoff) {
+          setCoolorsHandoff(data.coolorsHandoff as CoolorsHandoff);
+        }
         router.refresh();
         window.dispatchEvent(new Event("wedding-state-updated"));
         if (typeof data.redirectTo === "string" && data.redirectTo) {
