@@ -25,6 +25,14 @@ This guide covers first-time setup and where things live. Day-to-day, you mostly
    - Redirect URLs: `https://rosie-wedding-planner.vercel.app/auth/callback`, `http://localhost:3000/**`, `https://*-cburns33s-projects.vercel.app/**`
 6. Under **Authentication → Providers → Email**, ensure email sign-in is enabled (magic link)
 
+**Magic link + SSR (required for production):** `@supabase/ssr` uses PKCE. The default Supabase email button (`{{ .ConfirmationURL }}`) breaks when the link opens in Mail’s in-app browser or a different browser than the login page. Apply the PKCE-safe templates:
+
+```bash
+node scripts/apply-magic-link-template.mjs
+```
+
+This patches Magic Link and Confirm signup templates to use `token_hash` → `/auth/callback` (see `scripts/supabase-magic-link-template.json`). After changing templates, users must **request a fresh link** — old links are one-time use.
+
 ## 2. Anthropic API key
 
 Get your key at [console.anthropic.com](https://console.anthropic.com) → `ANTHROPIC_API_KEY`

@@ -31,7 +31,9 @@ export const INSPIRATION_MEMORY_TEMPLATE = `Use exactly these headings in the ma
 (Anything she said she might share later, or questions to revisit.)`;
 
 export function inspirationOpeningMessage(): string {
-  return `This is your Visual Inspo Depot — drop Pinterest screenshots, mood board grabs, or venue photos anytime. I'll describe what I notice and keep private notes so I can reference your taste later. Nothing is stored as an image file, just my written takeaways.
+  return `This is your Visual Inspo Depot — drop Pinterest screenshots, mood board grabs, dress inspo, or venue photos anytime. I'll describe what I notice and keep private notes so I can reference your taste later. Nothing is stored as an image file, just my written takeaways.
+
+Use the **attach button** (paperclip) for screenshots — don't paste images into the text field.
 
 Where should we start?`;
 }

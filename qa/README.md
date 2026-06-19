@@ -6,6 +6,8 @@ Working review file: [`qa/intro-review.md`](./intro-review.md)
 
 **QA agent prompt:** [`qa/intro-qa-prompt.md`](./intro-qa-prompt.md) — use **lean pass** for routine regression (API-first, 8 browser checkpoints); **full pass** for milestone sign-off.
 
+**Visual Inspo Depot QA:** [`qa/inspiration-qa-prompt.md`](./inspiration-qa-prompt.md) — paperclip attach only; never paste images into the text field.
+
 ## Environment
 
 | Item | Value |
@@ -55,7 +57,7 @@ Order matters for happy-path QA:
 
 ## Image upload
 
-Main `/chat` and **`/chat/inspiration`**: paperclip attach button, max 5 images (jpeg/png/webp, 5 MB each). Sent as base64 in `POST /api/chat`. Vendor focus threads have no attach button. Inspo images are analyzed in the turn only; nothing is stored as a file.
+Main `/chat` and **`/chat/inspiration`**: paperclip attach button, max 5 images (jpeg/png/webp). Images are resized client-side before send so payloads stay under platform limits. **Do not paste images into the text field** — use the paperclip. Vendor focus threads have no attach button. Inspo images are analyzed in the turn only; nothing is stored as a file.
 
 ## Color step (local QA shortcut)
 

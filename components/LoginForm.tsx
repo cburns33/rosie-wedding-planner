@@ -58,6 +58,14 @@ export default function LoginForm({ error }: LoginFormProps) {
         </p>
       )}
 
+      {error === "pkce" && (
+        <p className="text-sm text-blush text-center leading-relaxed">
+          That link opened in a different browser than where you requested it.
+          Request a fresh link below, then open it in Safari (or copy the link
+          into the same browser you used on the login page).
+        </p>
+      )}
+
       {error === "setup" && (
         <p className="text-sm text-blush text-center leading-relaxed">
           Auth isn&apos;t configured yet. Add{" "}

@@ -52,6 +52,10 @@ import {
   upsertInspirationMemory,
 } from "@/lib/inspiration";
 import type { WeddingState, Message, EmailDraft, PrimaryColorPicker, CoolorsHandoff } from "@/lib/types";
+import { messageContainsEmbeddedImage } from "@/lib/chat-images";
+
+export const maxDuration = 60;
+export const dynamic = "force-dynamic";
 
 const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
 
@@ -455,6 +459,34 @@ async function handleChatPost(req: Request) {
 
   let userMessage = typeof message === "string" ? message : "";
   const rawUserMessage = userMessage;
+
+  if (messageContainsEmbeddedImage(rawUserMessage)) {
+    return NextResponse.json(
+      {
+        error: "embedded_image",
+        message:
+          "Use the attach button (paperclip) for screenshots — don't paste images into the text field.",
+      },
+      { status: 400 }
+    );
+  }
+
+  if (imageList.length > 0) {
+    const parsedCount = imageList
+      .slice(0, MAX_IMAGES)
+      .map((img) => parseDataUrl(img))
+      .filter(Boolean).length;
+    if (parsedCount === 0) {
+      return NextResponse.json(
+        {
+          error: "invalid_images",
+          message:
+            "Those images couldn't be read. Use the attach button with a JPEG, PNG, or WebP screenshot.",
+        },
+        { status: 400 }
+      );
+    }
+  }
 
   if (
     threadKey === null &&

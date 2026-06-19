@@ -440,7 +440,9 @@ Runtime accent mapping: `lib/colors/theme.ts` → `paletteToThemeVars()` → `ap
 In `ROSIE_BASE_PROMPT` (`lib/system-prompt.ts`); all subject to change as Kelsie updates:
 
 - Budget: $75,000 · Guests: 250–300 · Date: spring 2027
+- Venue: Boxwood Manor, Tomball TX (Houston area) — [boxwoodmanorevents.com](https://www.boxwoodmanorevents.com/)
 - Location: southeast/central Texas, Houston hub
+- Pre-proposal research: Kelsie has been casually planning (dresses, bridesmaid dresses, likely other saved inspo). **Visual Inspo Depot** (`/chat/inspiration`) is the right home for screenshots and mood boards once she starts sharing; `inspiration_memory` holds Rosie's internal notes (bootstrap via `scripts/seed-boxwood-venue.mjs`).
 - Aesthetic: from `wedding_state.aesthetic` after intro (not hardcoded in prompt)
 - Music: DJ + possible live instrument (no full band)
 - Decision style: 3 options at a time, one question at a time

@@ -11,6 +11,11 @@ import { primaryColorLabel } from "@/lib/colors/primary-colors";
 import VendorEmailDraftCard from "./VendorEmailDraftCard";
 import PrimaryColorPickerCard from "./PrimaryColorPickerCard";
 import { isInspirationThreadKey } from "@/lib/inspiration";
+import {
+  estimateChatPayloadBytes,
+  MAX_CHAT_REQUEST_BYTES,
+  messageContainsEmbeddedImage,
+} from "@/lib/chat-images";
 
 interface DisplayMessage {
   role: "user" | "assistant";
@@ -88,6 +93,18 @@ export default function ChatInterface({
     images?: string[],
     primaryPicks?: string[]
   ) {
+    if (messageContainsEmbeddedImage(text)) {
+      setMessages((prev) => [
+        ...prev,
+        {
+          role: "assistant",
+          content:
+            "Use the attach button (paperclip) for screenshots — don't paste images into the text field.",
+        },
+      ]);
+      return;
+    }
+
     setMessages((prev) => [
       ...prev,
       {
@@ -109,14 +126,39 @@ export default function ChatInterface({
         hasStoredInitial.current = true;
       }
 
+      if (estimateChatPayloadBytes(body) > MAX_CHAT_REQUEST_BYTES) {
+        setMessages((prev) => [
+          ...prev,
+          {
+            role: "assistant",
+            content:
+              "That upload is still too large to send. Try one screenshot at a time, or a smaller image.",
+          },
+        ]);
+        return;
+      }
+
       const res = await fetch("/api/chat", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(body),
       });
 
-      const data = await res.json();
+      let data: Record<string, unknown> = {};
+      const responseText = await res.text();
+      if (responseText) {
+        try {
+          data = JSON.parse(responseText) as Record<string, unknown>;
+        } catch {
+          data = {};
+        }
+      }
+
       if (!res.ok) {
+        const fallback =
+          res.status === 413
+            ? "That screenshot is too large to send. Use the attach button and try a smaller image."
+            : "Rosie's having a brief connection hiccup. Try sending that again.";
         setMessages((prev) => [
           ...prev,
           {
@@ -124,7 +166,7 @@ export default function ChatInterface({
             content:
               typeof data.message === "string" && data.message.trim()
                 ? data.message
-                : "Rosie's having a brief connection hiccup. Try sending that again.",
+                : fallback,
           },
         ]);
         return;
@@ -150,10 +192,11 @@ export default function ChatInterface({
         ]);
       }
     } catch {
-      setMessages((prev) => [
-        ...prev,
-        { role: "assistant", content: "Something went wrong. Try again in a moment." },
-      ]);
+      const content =
+        images && images.length > 0
+          ? "That screenshot didn't go through — try the attach button again with a smaller image."
+          : "Something went wrong. Try again in a moment.";
+      setMessages((prev) => [...prev, { role: "assistant", content }]);
     } finally {
       setLoading(false);
     }

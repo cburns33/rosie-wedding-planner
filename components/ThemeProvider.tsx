@@ -6,9 +6,15 @@ import type { WeddingState } from "@/lib/types";
 
 async function fetchWeddingState(): Promise<WeddingState | null> {
   try {
-    const res = await fetch("/api/wedding-state", { cache: "no-store" });
+    const res = await fetch("/api/wedding-state", {
+      cache: "no-store",
+      // Unauthenticated requests redirect to /login HTML; do not follow that.
+      redirect: "error",
+    });
     if (!res.ok) return null;
-    return res.json();
+    const contentType = res.headers.get("content-type") ?? "";
+    if (!contentType.includes("application/json")) return null;
+    return (await res.json()) as WeddingState;
   } catch {
     return null;
   }
