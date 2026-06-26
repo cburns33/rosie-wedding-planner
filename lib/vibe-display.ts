@@ -23,6 +23,41 @@ function truncateAtWord(text: string, maxChars: number): string {
   return cut.length > 0 ? `${cut}…` : `${text.slice(0, maxChars)}…`;
 }
 
+const LEAD_IN_PATTERNS: RegExp[] = [
+  /^(i|we)\s+((really|absolutely|honestly|totally|definitely|just|kind of|sort of)\s+)?((would|could|might|do)\s+)?(love|loved|like|liked|want|wanted|adore|enjoy|prefer|think|feel)\s+(to\s+)?(have\s+|do\s+|use\s+|see\s+|go\s+(for|with)\s+)?/i,
+  /^i'?d\s+((really|absolutely)\s+)?(love|like|want|prefer)\s+(to\s+)?(have\s+)?/i,
+  /^(honestly|maybe|probably|personally|for me|i'?m thinking|i guess|i think|i feel like|something like)[,:]?\s+/i,
+];
+
+/** Drop conversational first-person preambles so quotes read like a vibe board, not a transcript. */
+function stripLeadIn(text: string | null | undefined): string | null {
+  if (!text?.trim()) return null;
+  let s = text.trim();
+  for (let pass = 0; pass < 2; pass += 1) {
+    let changed = false;
+    for (const pattern of LEAD_IN_PATTERNS) {
+      const next = s.replace(pattern, "").trim();
+      if (next !== s && next.length > 0) {
+        s = next;
+        changed = true;
+      }
+    }
+    if (!changed) break;
+  }
+  if (!s) return null;
+  return s.charAt(0).toUpperCase() + s.slice(1);
+}
+
+const VAGUE_PHRASE =
+  /^(it all|all of it|all|everything|anything|whatever|both|either|the whole thing|all the things|not sure|unsure|idk|i don'?t know|dunno|no idea|nothing|none|no|maybe|i guess|tbd|n\/?a)$/i;
+
+/** A non-answer that should never become a chip (e.g. "I would want it all"). */
+function isVaguePhrase(text: string | null | undefined): boolean {
+  if (!text?.trim()) return true;
+  const s = text.trim().replace(/[.!?]+$/, "").toLowerCase();
+  return VAGUE_PHRASE.test(s) || s.length <= 2;
+}
+
 /** Exact excerpt from an answer, wrapped in quotes for display. */
 export function quoteExcerpt(
   text: string | null | undefined,
@@ -64,6 +99,8 @@ export function normalizeVibePhrase(text: string): string {
     .replace(/^and\s+/i, "")
     .replace(/\.$/, "")
     .replace(/\s+/g, " ");
+
+  s = stripLeadIn(s) ?? "";
 
   if (s.length > 32) {
     s = trimWords(s, 4);
@@ -123,10 +160,10 @@ export function finalizeVibeDisplayFields(
 } {
   const borrow = (aesthetic.borrow ?? [])
     .map(normalizeVibePhrase)
-    .filter(Boolean);
+    .filter((phrase) => phrase && !isVaguePhrase(phrase));
   const avoid = (aesthetic.avoid ?? [])
     .map(normalizeVibePhrase)
-    .filter(Boolean);
+    .filter((phrase) => phrase && !isVaguePhrase(phrase));
 
   const style =
     summarizeFeelingPhrase(aesthetic.inspiration.feeling) ??
@@ -213,28 +250,41 @@ export function getYourVibePresentation(
     feeling: null,
     structural: null,
   };
-  const feeling = inspiration.feeling ?? aesthetic.style;
-  const headline = buildWovenHeadline(feeling, inspiration.moment);
 
-  const momentShort = quoteShortClause(inspiration.moment, 44);
-  const momentCandidate = buildMomentLine(inspiration.moment);
-  const shortInner = momentShort?.slice(1, -1) ?? "";
-  const fullInner = momentCandidate?.slice(1, -1) ?? "";
-  const momentLine =
-    momentCandidate && fullInner.length > shortInner.length + 8
-      ? momentCandidate
-      : null;
+  const cleanedFeeling = stripLeadIn(inspiration.feeling ?? aesthetic.style);
+  const cleanedMoment = stripLeadIn(inspiration.moment);
 
-  const inspiredBy = quoteExcerpt(inspiration.structural, 80);
+  // Headline is the feeling (her summarized mood); the moment is a supporting
+  // line. Only fall back to the moment for the headline when there is no feeling.
+  const headline =
+    quoteExcerpt(cleanedFeeling, 64) ?? quoteExcerpt(cleanedMoment, 96);
+  const momentBecameHeadline = !cleanedFeeling && Boolean(cleanedMoment);
+
+  let momentLine = momentBecameHeadline ? null : buildMomentLine(cleanedMoment);
+
+  // Never repeat the same sentence in both the headline and the moment line.
+  if (headline && momentLine) {
+    const headInner = headline.slice(1, -1).toLowerCase();
+    const lineInner = momentLine.slice(1, -1).toLowerCase();
+    if (
+      headInner === lineInner ||
+      headInner.startsWith(lineInner) ||
+      lineInner.startsWith(headInner)
+    ) {
+      momentLine = null;
+    }
+  }
+
+  const inspiredBy = quoteExcerpt(stripLeadIn(inspiration.structural), 80);
 
   const details = (aesthetic.borrow ?? [])
     .map(normalizeVibePhrase)
-    .filter(Boolean)
+    .filter((phrase) => phrase && !isVaguePhrase(phrase))
     .slice(0, 4);
 
   const avoid = (aesthetic.avoid ?? [])
     .map(normalizeVibePhrase)
-    .filter(Boolean)
+    .filter((phrase) => phrase && !isVaguePhrase(phrase))
     .slice(0, 3);
 
   return { headline, momentLine, inspiredBy, details, avoid };

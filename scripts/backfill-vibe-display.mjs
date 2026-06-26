@@ -31,6 +31,39 @@ function trimWords(text, maxWords) {
   return text.trim().split(/\s+/).slice(0, maxWords).join(" ");
 }
 
+const LEAD_IN_PATTERNS = [
+  /^(i|we)\s+((really|absolutely|honestly|totally|definitely|just|kind of|sort of)\s+)?((would|could|might|do)\s+)?(love|loved|like|liked|want|wanted|adore|enjoy|prefer|think|feel)\s+(to\s+)?(have\s+|do\s+|use\s+|see\s+|go\s+(for|with)\s+)?/i,
+  /^i'?d\s+((really|absolutely)\s+)?(love|like|want|prefer)\s+(to\s+)?(have\s+)?/i,
+  /^(honestly|maybe|probably|personally|for me|i'?m thinking|i guess|i think|i feel like|something like)[,:]?\s+/i,
+];
+
+const VAGUE_PHRASE =
+  /^(it all|all of it|all|everything|anything|whatever|both|either|the whole thing|all the things|not sure|unsure|idk|i don'?t know|dunno|no idea|nothing|none|no|maybe|i guess|tbd|n\/?a)$/i;
+
+function stripLeadIn(text) {
+  if (!text?.trim()) return null;
+  let s = text.trim();
+  for (let pass = 0; pass < 2; pass += 1) {
+    let changed = false;
+    for (const pattern of LEAD_IN_PATTERNS) {
+      const next = s.replace(pattern, "").trim();
+      if (next !== s && next.length > 0) {
+        s = next;
+        changed = true;
+      }
+    }
+    if (!changed) break;
+  }
+  if (!s) return null;
+  return s.charAt(0).toUpperCase() + s.slice(1);
+}
+
+function isVaguePhrase(text) {
+  if (!text?.trim()) return true;
+  const s = text.trim().replace(/[.!?]+$/, "").toLowerCase();
+  return VAGUE_PHRASE.test(s) || s.length <= 2;
+}
+
 function normalizeVibePhrase(text) {
   let s = text
     .trim()
@@ -38,6 +71,7 @@ function normalizeVibePhrase(text) {
     .replace(/^and\s+/i, "")
     .replace(/\.$/, "")
     .replace(/\s+/g, " ");
+  s = stripLeadIn(s) ?? "";
   if (s.length > 32) s = trimWords(s, 4);
   if (!s) return s;
   return s.charAt(0).toUpperCase() + s.slice(1);
@@ -53,8 +87,12 @@ function summarizeFeelingPhrase(text) {
 }
 
 function finalizeVibeDisplayFields(aesthetic) {
-  const borrow = (aesthetic.borrow ?? []).map(normalizeVibePhrase).filter(Boolean);
-  const avoid = (aesthetic.avoid ?? []).map(normalizeVibePhrase).filter(Boolean);
+  const borrow = (aesthetic.borrow ?? [])
+    .map(normalizeVibePhrase)
+    .filter((phrase) => phrase && !isVaguePhrase(phrase));
+  const avoid = (aesthetic.avoid ?? [])
+    .map(normalizeVibePhrase)
+    .filter((phrase) => phrase && !isVaguePhrase(phrase));
   const style =
     summarizeFeelingPhrase(aesthetic.inspiration?.feeling) ??
     summarizeFeelingPhrase(aesthetic.style);

@@ -179,7 +179,7 @@ The `wedding_state.data` shape is in `lib/types.ts` (`WeddingState`), seeded in 
 
 ## Testing
 
-Unit tests run on **Vitest** (`vitest.config.ts`, Node environment, tsconfig path aliases resolved natively).
+Unit tests run on **Vitest** (`vitest.config.ts`, Node environment, `@/*` resolved via an explicit `resolve.alias` to the repo root).
 
 ```bash
 npm test          # run once
@@ -206,7 +206,7 @@ Server-fetches `wedding_state`, renders `PlanningHomeShell` (client wrapper).
 
 - **Intro redirect:** while `aesthetic.introCompleted === false`, `app/page.tsx` redirects to `/chat` (`shouldRedirectToIntroChat()` in `lib/intro.ts`). Planning home is unavailable until the vibe arc finishes.
 - **Briefing** (`PlanningHome.tsx`): hero, **Your vibe** (`YourVibeCard.tsx`), up-next card, milestone strip, summary cards (**Visual Inspo Depot** replaces budget-left card), then **The details** (`Dashboard.tsx`).
-- **Your vibe card:** Categorized display via `lib/vibe-display.ts` — quoted headline (feeling + moment), muted moment line, **Inspired by**, **Details** chips, 5 palette swatches, **Skipping** chips. `aesthetic.style` is a short feeling label only (not a mashup).
+- **Your vibe card:** Categorized display via `lib/vibe-display.ts` — quoted headline (her feeling alone), muted moment line (the moment as a separate supporting line, de-duplicated so it never repeats the headline), **Inspired by**, **Details** chips, 5 palette swatches, **Skipping** chips. `aesthetic.style` is a short feeling label only (not a mashup). Display cleans the saved answers: `stripLeadIn()` removes conversational preambles ("I love"/"I want") from quotes and chips, and `isVaguePhrase()` drops non-answers ("all of it", "everything") so they never render as chips. Capture-side, the intro beats (`lib/intro-beats.ts`) and `ROSIE_BASE_PROMPT` instruct Rosie to save short extracted qualities, not raw chat sentences.
 - **Welcome overlay** (`WelcomeOverlay.tsx`): trimmed copy; shows only when `intro_completed === false` **and** vibe intro is already complete (`shouldShowWelcome()`). Dismiss via `POST /api/wedding-state/complete-intro` → scroll to `#up-next`.
 - **Visual Inspo Depot card:** Links to `/chat/inspiration`. Uses `bg-sage-pale` + `text-warm-dark` (not cream on `bg-sage`) so copy stays readable when `ThemeProvider` remaps `--color-sage` to a light palette color.
 - **Live updates**: debounced refetch on tab focus / `wedding-state-updated` (`PlanningHomeShell` → `/api/wedding-state`, `/api/inspiration-memory`, Zola). Client merges API JSON via `mergeWeddingState()`. **Theme**: `ThemeProvider` applies accent CSS vars when `aesthetic.themeApplied && palette.length >= 5`.
@@ -431,7 +431,7 @@ Runtime accent mapping: `lib/colors/theme.ts` → `paletteToThemeVars()` → `ap
 - Aesthetic: editorial wedding / serif + whitespace
 - Avoid: Asana, Monday, Notion databases, generic admin dashboards
 
-**Your vibe on home:** `YourVibeCard.tsx` + `lib/vibe-display.ts` — quoted headline (feeling + moment), muted moment line, Inspired by, Details chips, 5 swatches, Skipping chips. Legacy aesthetic placeholders in `Dashboard.tsx` remain hidden.
+**Your vibe on home:** `YourVibeCard.tsx` + `lib/vibe-display.ts` — quoted headline (feeling alone), muted moment line (de-duplicated against the headline), Inspired by, Details chips, 5 swatches, Skipping chips. Quotes and chips are cleaned of "I love"/"I want" lead-ins and vague non-answers. Legacy aesthetic placeholders in `Dashboard.tsx` remain hidden.
 
 ---
 
@@ -455,11 +455,12 @@ In `ROSIE_BASE_PROMPT` (`lib/system-prompt.ts`); all subject to change as Kelsie
 
 - **Welcome overlay flag (STEP-06)** — fixed: `isProtectedFromChatWeddingDataPath()` blocks `intro_completed` in chat `applyWeddingDataUpdate()`; only `POST /api/wedding-state/complete-intro` sets the flag.
 - **Inspo card empty with notes present** — `summarizeInspirationMemory()` only counts bullets matching `- (YYYY-MM-DD)`. Rosie must use that format under **Observations** or the home card stays empty.
-- **Message persistence (STEP-11)** — reset script often reports "Cleared 0 messages"; intro uses `introUserTurns` as fallback progress counter.
+- **Message persistence (STEP-11)** — resolved 2026-06-26. The "Cleared 0 messages" symptom was the missing `messages_id_seq` grant (see grants note below): inserts always failed, so the table stayed empty. Intro still uses `introUserTurns` as a fallback progress counter, but normal chat history now persists.
 - **Dev server hang (local)** — long-running `npm run dev` can stop responding (browser refresh appears to do nothing; requests time out). Fix: Ctrl+C and restart `npm run dev`. Home refetch is debounced to reduce load.
 - **Partial DB aesthetic rows** — `mergeWeddingState()` normalizes arrays and `inspiration` so home does not crash on refresh; still backfill old rows if cards look wrong (`scripts/backfill-vibe-display.mjs`).
 - **Schema migration required** for vendor focuses — run the `thread_key` + `vendor_memory` block in `supabase/schema.sql` if not already applied. Chat POST fails without `thread_key` column.
-- **`service_role` grants are easy to miss.** Applying `schema.sql` partially (tables without the `GRANT … TO service_role` lines) leaves server-side reads/writes failing with `permission denied`. Because the app historically did not check the Supabase error, this failed silently: RSVP reconcile never landed in `wedding_state` and chat history never saved. A live-DB migration on 2026-06-12 (`grant_service_role_dml_on_wedding_state_and_messages`) restored the missing grants on `wedding_state` + `messages`; reconcile now throws on a rejected write so it can never fail silently again.
+- **`service_role` grants are easy to miss.** Applying `schema.sql` partially (tables without the `GRANT … TO service_role` lines) leaves server-side reads/writes failing with `permission denied`. Because the app historically did not check the Supabase error, this failed silently: RSVP reconcile never landed in `wedding_state` and chat history never saved. A live-DB migration on 2026-06-12 (`grant_service_role_dml_on_wedding_state_and_messages`) restored the missing **table** grants on `wedding_state` + `messages`; reconcile now throws on a rejected write so it can never fail silently again.
+- **`messages` sequence grant was the real chat-history bug.** The 2026-06-12 table grant was necessary but not sufficient: `messages.id` is a `bigserial`, and `service_role` was never granted `USAGE` on `messages_id_seq`, so every chat INSERT still failed with `permission denied for sequence messages_id_seq` and history kept silently dropping (the table read as empty, with `id` resetting to 1 because no insert ever advanced the sequence). `wedding_state`/`inspiration_memory`/`vendor_memory` use fixed/text keys, so only `messages` was affected — which is why other state saved fine. Fixed via a migration on 2026-06-26 (`grant_messages_id_seq_to_service_role`) and added to `schema.sql`. `saveMessage()` now reports a failed insert to Sentry (tag `feature: chat_persistence`, DB error code only — never message content) instead of swallowing it, so any future persistence break alerts rather than losing data.
 - **Vercel preview env vars** — production and development env vars are set; preview (PR) deploys may need the same vars added manually in the Vercel dashboard if you use branch previews.
 - **Replay intro:** `node scripts/reset-intro.mjs` or `qa/reset-intro.sql` — clears main-thread messages and resets intro/aesthetic flags.
 - **Legacy DB rows:** use `mergeWeddingState()` when loading `wedding_state` so partial `aesthetic` objects do not crash home (e.g. missing `layout`).

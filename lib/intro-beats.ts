@@ -167,7 +167,7 @@ Kelsie just described a wedding moment. Your job this turn:
 
 Do NOT ask about structural layout, venue format, colors, or ceremony details yet.
 Do NOT ask a second question or offer multiple sub-questions.
-Quietly save \`aesthetic.inspiration.moment\` via update_wedding_data if you have enough from her answer.`,
+Quietly save \`aesthetic.inspiration.moment\` via update_wedding_data if you have enough from her answer. Save a clean, concise description in her words — drop conversational lead-ins like "I love" or "I want", no full chat sentence.`,
 
   "3": `**Intro beat 3 — structural inspiration (this turn only)**
 
@@ -195,7 +195,7 @@ Your job this turn:
 ${FEELING_REASK_FORBIDDEN}
 Do NOT re-ask beat 3 (reference wedding / layout inspo). Do NOT ask about colors yet.
 
-Quietly save \`aesthetic.inspiration.structural\`, \`aesthetic.borrow\`, \`aesthetic.avoid\`, and \`aesthetic.layout\` via update_wedding_data.`,
+Quietly save \`aesthetic.inspiration.structural\`, \`aesthetic.borrow\`, \`aesthetic.avoid\`, and \`aesthetic.layout\` via update_wedding_data. Store EXTRACTED QUALITIES, not her raw sentence: each \`borrow\`/\`avoid\`/\`layout\` item is a short 2-5 word phrase (e.g. "long tables", "outdoor ceremony", "no church formality"), and \`structural\` is the place or wedding itself (e.g. "Boxwood Manor"), with no "I love"/"I want" lead-in. If her answer is a non-answer like "all of it" or "everything", do NOT invent chips — leave \`borrow\` empty rather than saving the filler.`,
 
   "5a": `**Intro beat 5a — primary colors (this turn only)**
 

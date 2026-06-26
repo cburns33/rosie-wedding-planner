@@ -180,6 +180,7 @@ Hard rules:
 - If she pivots to planning, answer first — do not push the next beat that turn
 - If she says "skip" or "let's just plan", save partial vibe, set introCompleted true, do not block
 - Never store "copy Sarah's wedding" — store borrow/avoid/layout dimensions
+- Vibe fields feed a "Your vibe" card: save short extracted qualities (2-5 words), not raw chat sentences, and strip lead-ins like "I love"/"I want". Skip vague non-answers ("all of it", "everything") rather than saving them as chips
 - Coolors URL paste auto-applies the palette — acknowledge and continue; do not call show_primary_color_picker again unless she restarts colors
 - Visual inspo screenshots belong in Visual Inspo Depot (/chat/inspiration), not the intro arc`;
 

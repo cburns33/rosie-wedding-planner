@@ -148,4 +148,42 @@ describe("vibe display", () => {
     expect(view.details).toEqual(["Long tables", "Outdoor ceremony", "Candlelit warmth"]);
     expect(view.avoid).toEqual(["Church formality", "Heavy rustic decor"]);
   });
+
+  it("cleans first-person phrasing and drops non-answer chips", () => {
+    const aesthetic = {
+      ...mergeWeddingState().aesthetic,
+      style: "Fun energy and romantic ambiance",
+      inspiration: {
+        feeling: "Fun energy and romantic ambiance",
+        moment: "I love weddings with fun bright colors and yet very classy vibes",
+        structural: "I love Boxwood Manor in Tomball, Texas",
+      },
+      borrow: ["I would want it all"],
+      avoid: [],
+    };
+    const view = getYourVibePresentation(aesthetic);
+
+    expect(view.headline).toBe('"Fun energy and romantic ambiance"');
+    expect(view.momentLine).toBe(
+      '"Weddings with fun bright colors and yet very classy vibes"'
+    );
+    expect(view.inspiredBy).toBe('"Boxwood Manor in Tomball, Texas"');
+    expect(view.details).toEqual([]);
+  });
+
+  it("does not repeat the moment in both the headline and the moment line", () => {
+    const aesthetic = {
+      ...mergeWeddingState().aesthetic,
+      style: null,
+      inspiration: {
+        feeling: null,
+        moment: "Garden cocktail hour with string lights",
+        structural: null,
+      },
+    };
+    const view = getYourVibePresentation(aesthetic);
+
+    expect(view.headline).toContain("Garden cocktail hour");
+    expect(view.momentLine).toBeNull();
+  });
 });
