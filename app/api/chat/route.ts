@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import * as Sentry from "@sentry/nextjs";
 import Anthropic from "@anthropic-ai/sdk";
 import { getSupabase } from "@/lib/supabase";
 import {
@@ -88,7 +89,25 @@ async function saveMessage(
   content: string,
   threadKey: ChatThreadKey
 ) {
-  await getSupabase().from("messages").insert({ role, content, thread_key: threadKey });
+  const { error } = await getSupabase()
+    .from("messages")
+    .insert({ role, content, thread_key: threadKey });
+
+  // A failed insert here silently loses chat history (the cause of the empty
+  // `messages` table). Surface it to Sentry instead of swallowing it. Only the
+  // DB error code/message is sent — never the message content.
+  if (error) {
+    Sentry.captureException(
+      new Error(`Failed to persist ${role} message: ${error.message}`),
+      {
+        tags: {
+          feature: "chat_persistence",
+          thread: threadKey ?? "main",
+          db_error_code: error.code ?? "unknown",
+        },
+      }
+    );
+  }
 }
 
 async function getVendorMemory(vendor: VendorKey): Promise<string> {

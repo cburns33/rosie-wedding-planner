@@ -127,3 +127,9 @@ REVOKE ALL ON public.messages FROM anon, authenticated;
 REVOKE ALL ON public.wedding_state FROM anon, authenticated;
 GRANT SELECT, INSERT, UPDATE, DELETE ON public.messages TO service_role;
 GRANT SELECT, INSERT, UPDATE, DELETE ON public.wedding_state TO service_role;
+
+-- messages.id is a bigserial; service_role also needs the sequence or every
+-- INSERT fails with "permission denied for sequence messages_id_seq" and chat
+-- history silently never saves. (wedding_state uses a fixed id, so no sequence.)
+GRANT USAGE, SELECT ON SEQUENCE public.messages_id_seq TO service_role;
+REVOKE ALL ON SEQUENCE public.messages_id_seq FROM anon, authenticated;
