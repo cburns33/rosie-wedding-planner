@@ -51,6 +51,10 @@ export default function PlanningHome({
   const upNext = getUpNext(data);
   const milestones = getMilestones(data);
   const summary = getSummary(data);
+  const venueNames = [
+    data.venue.selected?.name,
+    ...data.venue.shortlist.map((entry) => entry.name),
+  ].filter((name): name is string => Boolean(name?.trim()));
 
   return (
     <>
@@ -72,7 +76,7 @@ export default function PlanningHome({
           </p>
         </header>
 
-        <YourVibeCard aesthetic={data.aesthetic} />
+        <YourVibeCard aesthetic={data.aesthetic} venueNames={venueNames} />
 
         {/* Up next — entire card is the action */}
         <section

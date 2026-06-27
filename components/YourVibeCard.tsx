@@ -4,6 +4,7 @@ import { getYourVibePresentation } from "@/lib/vibe-display";
 
 interface YourVibeCardProps {
   aesthetic: WeddingState["aesthetic"];
+  venueNames?: string[];
 }
 
 function hasVibeContent(aesthetic: WeddingState["aesthetic"] | undefined): boolean {
@@ -31,11 +32,11 @@ function SectionLabel({ children }: { children: React.ReactNode }) {
   );
 }
 
-export default function YourVibeCard({ aesthetic }: YourVibeCardProps) {
+export default function YourVibeCard({ aesthetic, venueNames }: YourVibeCardProps) {
   if (!hasVibeContent(aesthetic)) return null;
 
   const { headline, momentLine, inspiredBy, details = [], avoid = [] } =
-    getYourVibePresentation(aesthetic);
+    getYourVibePresentation(aesthetic, { knownVenues: venueNames });
   const swatches = (Array.isArray(aesthetic.palette) ? aesthetic.palette : [])
     .filter((c) => typeof c === "string" && c.startsWith("#"))
     .slice(0, 5);

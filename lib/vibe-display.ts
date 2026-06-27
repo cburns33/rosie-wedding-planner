@@ -58,8 +58,31 @@ function isVaguePhrase(text: string | null | undefined): boolean {
   return VAGUE_PHRASE.test(s) || s.length <= 2;
 }
 
-/** Exact excerpt from an answer, wrapped in quotes for display. */
-export function quoteExcerpt(
+function normalizeForMatch(text: string): string {
+  return text
+    .toLowerCase()
+    .replace(/["'.,]/g, "")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+/** True when an excerpt is really just the couple's own venue (so it adds nothing). */
+function matchesKnownVenue(
+  excerpt: string,
+  knownVenues: string[] | undefined
+): boolean {
+  if (!knownVenues?.length) return false;
+  const a = normalizeForMatch(excerpt);
+  if (!a) return false;
+  return knownVenues.some((venue) => {
+    const b = normalizeForMatch(venue);
+    if (b.length < 3) return false;
+    return a.includes(b) || b.includes(a);
+  });
+}
+
+/** Plain (unquoted) excerpt: prefer the first sentence, else truncate at a word. */
+function plainExcerpt(
   text: string | null | undefined,
   maxChars: number
 ): string | null {
@@ -73,7 +96,16 @@ export function quoteExcerpt(
     excerpt = truncateAtWord(excerpt, maxChars);
   }
 
-  return `"${excerpt}"`;
+  return excerpt;
+}
+
+/** Exact excerpt from an answer, wrapped in quotes for display. */
+export function quoteExcerpt(
+  text: string | null | undefined,
+  maxChars: number
+): string | null {
+  const excerpt = plainExcerpt(text, maxChars);
+  return excerpt === null ? null : `"${excerpt}"`;
 }
 
 /** Short quoted clause for weaving moment into the headline. */
@@ -135,12 +167,6 @@ export function buildWovenHeadline(
 
   if (feelingQ && momentQ) return `${feelingQ} · ${momentQ}`;
   return feelingQ ?? momentQ;
-}
-
-/** Muted one-liner for the moment answer. */
-export function buildMomentLine(text: string | null | undefined): string | null {
-  if (!text?.trim()) return null;
-  return quoteExcerpt(text, 96);
 }
 
 /** @deprecated Use buildWovenHeadline; kept for tests and legacy callers. */
@@ -243,7 +269,8 @@ export function applyIntroCompletionSideEffects(
 
 /** Card-ready copy from structured intro answers. */
 export function getYourVibePresentation(
-  aesthetic: WeddingState["aesthetic"]
+  aesthetic: WeddingState["aesthetic"],
+  options?: { knownVenues?: string[] }
 ): YourVibePresentation {
   const inspiration = aesthetic.inspiration ?? {
     moment: null,
@@ -256,16 +283,17 @@ export function getYourVibePresentation(
 
   // Headline is the feeling (her summarized mood); the moment is a supporting
   // line. Only fall back to the moment for the headline when there is no feeling.
+  // Rendered as plain third-person text — no quotation marks, no first person.
   const headline =
-    quoteExcerpt(cleanedFeeling, 64) ?? quoteExcerpt(cleanedMoment, 96);
+    plainExcerpt(cleanedFeeling, 64) ?? plainExcerpt(cleanedMoment, 96);
   const momentBecameHeadline = !cleanedFeeling && Boolean(cleanedMoment);
 
-  let momentLine = momentBecameHeadline ? null : buildMomentLine(cleanedMoment);
+  let momentLine = momentBecameHeadline ? null : plainExcerpt(cleanedMoment, 96);
 
   // Never repeat the same sentence in both the headline and the moment line.
   if (headline && momentLine) {
-    const headInner = headline.slice(1, -1).toLowerCase();
-    const lineInner = momentLine.slice(1, -1).toLowerCase();
+    const headInner = headline.toLowerCase();
+    const lineInner = momentLine.toLowerCase();
     if (
       headInner === lineInner ||
       headInner.startsWith(lineInner) ||
@@ -275,7 +303,12 @@ export function getYourVibePresentation(
     }
   }
 
-  const inspiredBy = quoteExcerpt(stripLeadIn(inspiration.structural), 80);
+  // "Inspired by" is meant to surface a *different* reference wedding. When the
+  // structural answer is just the couple's own venue, it is redundant — hide it.
+  let inspiredBy = plainExcerpt(stripLeadIn(inspiration.structural), 80);
+  if (inspiredBy && matchesKnownVenue(inspiredBy, options?.knownVenues)) {
+    inspiredBy = null;
+  }
 
   const details = (aesthetic.borrow ?? [])
     .map(normalizeVibePhrase)

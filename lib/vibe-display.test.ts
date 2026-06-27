@@ -141,10 +141,12 @@ describe("vibe display", () => {
       avoid: ["church formality", "heavy rustic decor"],
     };
     const view = getYourVibePresentation(aesthetic);
-    expect(view.headline).toContain('"Relaxed and warm"');
-    expect(view.headline).not.toContain("vineyard");
+    expect(view.headline).toBe("Relaxed and warm");
+    expect(view.headline).not.toContain('"');
     expect(view.momentLine).toContain("garden cocktail hour");
+    expect(view.momentLine).not.toContain('"');
     expect(view.inspiredBy).toContain("vineyard wedding");
+    expect(view.inspiredBy).not.toContain('"');
     expect(view.details).toEqual(["Long tables", "Outdoor ceremony", "Candlelit warmth"]);
     expect(view.avoid).toEqual(["Church formality", "Heavy rustic decor"]);
   });
@@ -163,12 +165,45 @@ describe("vibe display", () => {
     };
     const view = getYourVibePresentation(aesthetic);
 
-    expect(view.headline).toBe('"Fun energy and romantic ambiance"');
+    expect(view.headline).toBe("Fun energy and romantic ambiance");
     expect(view.momentLine).toBe(
-      '"Weddings with fun bright colors and yet very classy vibes"'
+      "Weddings with fun bright colors and yet very classy vibes"
     );
-    expect(view.inspiredBy).toBe('"Boxwood Manor in Tomball, Texas"');
+    expect(view.inspiredBy).toBe("Boxwood Manor in Tomball, Texas");
     expect(view.details).toEqual([]);
+  });
+
+  it("hides Inspired by when it is just the couple's own venue", () => {
+    const aesthetic = {
+      ...mergeWeddingState().aesthetic,
+      inspiration: {
+        feeling: "Fun energy and romantic ambiance",
+        moment: "Bright colors but still classy",
+        structural: "I love Boxwood Manor in Tomball, Texas. My dream venue.",
+      },
+    };
+
+    expect(getYourVibePresentation(aesthetic).inspiredBy).toContain("Boxwood Manor");
+    expect(
+      getYourVibePresentation(aesthetic, { knownVenues: ["Boxwood Manor"] })
+        .inspiredBy
+    ).toBeNull();
+  });
+
+  it("keeps Inspired by when it names a different reference wedding", () => {
+    const aesthetic = {
+      ...mergeWeddingState().aesthetic,
+      inspiration: {
+        feeling: "Relaxed and warm",
+        moment: null,
+        structural: "My cousin's vineyard wedding in Napa",
+      },
+    };
+
+    expect(
+      getYourVibePresentation(aesthetic, { knownVenues: ["Boxwood Manor"] })
+        .inspiredBy
+    ).toContain("vineyard wedding");
   });
 
   it("does not repeat the moment in both the headline and the moment line", () => {
