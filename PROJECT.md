@@ -397,14 +397,17 @@ vitest.config.ts              Vitest config (Node env, tsconfig path aliases)
 prd/
   intro-aesthetic-build-prompt.md  vibe intro + palette spec (see Shipped behavior)
   vendor-chats.md             spec for vendor focuses (implemented)
+  vendor-discovery-build-prompt.md  vendor discovery + shortlist spec (implemented)
 
 qa/
   README.md                   QA environment, reset, first-visit flow
   intro-review.md               QA checklist + issue log template
   reset-intro.sql               SQL reset for intro walkthroughs
+  vendor-discovery.md           QA environment, reset, checklist for vendor discovery/shortlist
 
 scripts/
   reset-intro.mjs               Node reset for intro walkthroughs
+  reset-vendor-focus.mjs        Node reset for one vendor focus (state, decisions, messages, memory)
   backfill-vibe-display.mjs     Backfill style/borrow/avoid from inspiration fields
   seed-primary-picker.mjs       Local QA: surface primary color picker without full intro
 
@@ -470,6 +473,7 @@ In `ROSIE_BASE_PROMPT` (`lib/system-prompt.ts`); all subject to change as Kelsie
 - **`messages` sequence grant was the real chat-history bug.** The 2026-06-12 table grant was necessary but not sufficient: `messages.id` is a `bigserial`, and `service_role` was never granted `USAGE` on `messages_id_seq`, so every chat INSERT still failed with `permission denied for sequence messages_id_seq` and history kept silently dropping (the table read as empty, with `id` resetting to 1 because no insert ever advanced the sequence). `wedding_state`/`inspiration_memory`/`vendor_memory` use fixed/text keys, so only `messages` was affected — which is why other state saved fine. Fixed via a migration on 2026-06-26 (`grant_messages_id_seq_to_service_role`) and added to `schema.sql`. `saveMessage()` now reports a failed insert to Sentry (tag `feature: chat_persistence`, DB error code only — never message content) instead of swallowing it, so any future persistence break alerts rather than losing data.
 - **Vercel preview env vars** — production and development env vars are set; preview (PR) deploys may need the same vars added manually in the Vercel dashboard if you use branch previews.
 - **Replay intro:** `node scripts/reset-intro.mjs` or `qa/reset-intro.sql` — clears main-thread messages and resets intro/aesthetic flags.
+- **Local dev shares the production Supabase project** — there is no separate staging DB, so anything saved while testing locally (vendor shortlists, chat messages, decisions, vendor memory) is real data. After testing a vendor focus, run `node scripts/reset-vendor-focus.mjs <vendor>` (see `qa/vendor-discovery.md`) before handing off or stepping away.
 - **Legacy DB rows:** use `mergeWeddingState()` when loading `wedding_state` so partial `aesthetic` objects do not crash home (e.g. missing `layout`).
 - **Tool use is sequential** — multiple `update_wedding_data` calls in one turn process one at a time (loop in `route.ts`).
 - **`/dashboard`** redirects to `/`; update any bookmarks.
