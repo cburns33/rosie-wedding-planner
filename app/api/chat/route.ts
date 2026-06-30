@@ -52,8 +52,18 @@ import {
   getInspirationMemory,
   upsertInspirationMemory,
 } from "@/lib/inspiration";
-import type { WeddingState, Message, EmailDraft, PrimaryColorPicker, CoolorsHandoff } from "@/lib/types";
+import type {
+  WeddingState,
+  Message,
+  EmailDraft,
+  PrimaryColorPicker,
+  CoolorsHandoff,
+  VendorCandidate,
+  VendorCandidates,
+  VendorShortlistEntry,
+} from "@/lib/types";
 import { messageContainsEmbeddedImage } from "@/lib/chat-images";
+import { sanitizeCandidates } from "@/lib/vendor-discovery";
 
 export const maxDuration = 60;
 export const dynamic = "force-dynamic";
@@ -137,6 +147,60 @@ async function appendVendorNote(
     : `- (${date}) ${note}`;
   const next = current.trim() ? `${current.trim()}\n${line}` : line;
   await upsertVendorMemory(vendor, next);
+}
+
+/** Adds (or replaces, by url) a candidate on a vendor category's shortlist. */
+async function addToVendorShortlist(
+  vendor: VendorKey,
+  candidate: VendorCandidate
+): Promise<void> {
+  const current = await getWeddingData();
+  const entry = current.vendors[vendor];
+  const dedupedShortlist = (entry?.shortlist ?? []).filter(
+    (item) => item.url !== candidate.url
+  );
+  const shortlist: VendorShortlistEntry[] = [
+    ...dedupedShortlist,
+    {
+      name: candidate.name,
+      location: candidate.location,
+      url: candidate.url,
+      priceHint: candidate.priceHint,
+      whyFits: candidate.whyFits,
+      email: candidate.email,
+      phone: candidate.phone,
+      addedAt: new Date().toISOString().split("T")[0],
+    },
+  ];
+
+  let updated = deepSet(
+    current as unknown as Record<string, unknown>,
+    `vendors.${vendor}.shortlist`,
+    shortlist
+  ) as unknown as WeddingState;
+
+  if (entry?.status === "undecided") {
+    updated = deepSet(
+      updated as unknown as Record<string, unknown>,
+      `vendors.${vendor}.status`,
+      "considering"
+    ) as unknown as WeddingState;
+  }
+
+  updated = {
+    ...updated,
+    decisions: [
+      ...updated.decisions,
+      {
+        date: new Date().toISOString().split("T")[0],
+        decision: `Added ${candidate.name} to ${VENDOR_LABELS[vendor].toLowerCase()} shortlist`,
+      },
+    ],
+  };
+
+  await getSupabase()
+    .from("wedding_state")
+    .upsert({ id: 1, data: updated, updated_at: new Date().toISOString() });
 }
 
 async function setPendingPrimaryPicker(active: boolean): Promise<void> {
@@ -466,6 +530,7 @@ async function handleChatPost(req: Request) {
     threadKey: rawThreadKey,
     images,
     primaryPicks: rawPrimaryPicks,
+    saveVendorCandidate,
   } = await req.json();
 
   const threadKey = parseChatThreadKey(rawThreadKey);
@@ -507,6 +572,18 @@ async function handleChatPost(req: Request) {
     }
   }
 
+  let savedCandidateName: string | null = null;
+  if (vendorKey && saveVendorCandidate && typeof saveVendorCandidate === "object") {
+    const [candidate] = sanitizeCandidates([saveVendorCandidate]);
+    if (candidate) {
+      await addToVendorShortlist(vendorKey, candidate);
+      await appendVendorNote(vendorKey, `Added to shortlist: ${candidate.name} — ${candidate.url}`, "Research");
+      savedCandidateName = candidate.name;
+      const shortlistCount = (await getWeddingData()).vendors[vendorKey]?.shortlist.length ?? 1;
+      userMessage = `${rawUserMessage}\n\n[System: Kelsie added ${candidate.name} to her ${VENDOR_LABELS[vendorKey].toLowerCase()} shortlist (${shortlistCount} now in consideration). Acknowledge briefly, mention the shortlist count naturally if it feels relevant, and offer to draft an inquiry email to ${candidate.name} specifically — ask for their contact email first if you don't have it from the search result. Do not re-list other shortlist options unless she asks.]`;
+    }
+  }
+
   if (
     threadKey === null &&
     Array.isArray(rawPrimaryPicks) &&
@@ -545,7 +622,7 @@ async function handleChatPost(req: Request) {
   const tools = getTools({
     vendorKey,
     inspiration: inspirationFocus,
-  }) as Anthropic.Tool[];
+  }) as Anthropic.ToolUnion[];
 
   const hasPrimaryPicksConfirm =
     threadKey === null &&
@@ -665,11 +742,12 @@ Kelsie attached image(s) on the main thread. For ongoing visual inspo, suggest V
   let assistantContentBlocks = response.content;
   let assistantText = extractAssistantText(assistantContentBlocks);
   let loopCount = 0;
-  const maxLoops = threadKey === null ? 5 : 3;
+  const maxLoops = threadKey === null ? 5 : vendorKey ? 5 : 3;
   let suggestFocus: { vendor: VendorKey; label: string } | null = null;
   let emailDraft: EmailDraft | null = null;
   let primaryColorPicker: PrimaryColorPicker | null = null;
   let coolorsHandoff: CoolorsHandoff | null = coolorsHandoffFromPicks;
+  let vendorCandidates: VendorCandidates | null = null;
 
   while (response.stop_reason === "tool_use" && loopCount < maxLoops) {
     const toolUseBlocks = response.content.filter(
@@ -739,6 +817,15 @@ Kelsie attached image(s) on the main thread. For ongoing visual inspo, suggest V
           result = "Suggestion surfaced.";
         } else {
           result = "Unknown vendor.";
+        }
+      } else if (block.name === "present_vendor_candidates") {
+        if (!vendorKey) {
+          result = "Vendor discovery only runs inside a vendor focus chat.";
+        } else {
+          const input = block.input as { candidates: unknown };
+          const items = sanitizeCandidates(input.candidates);
+          vendorCandidates = { vendor: vendorKey, items };
+          result = `Showed ${items.length} options to Kelsie.`;
         }
       } else if (block.name === "draft_vendor_email") {
         const input = block.input as {
@@ -859,7 +946,9 @@ Kelsie attached image(s) on the main thread. For ongoing visual inspo, suggest V
       "Sorry — I got tangled up for a second. Could you try sending that again?";
   }
 
-  const storedMessage = storedUserMessage(rawUserMessage, imageList.length);
+  const storedMessage = savedCandidateName
+    ? `Saved ${savedCandidateName} to considering.`
+    : storedUserMessage(rawUserMessage, imageList.length);
   await saveMessage("user", storedMessage, threadKey);
   await saveMessage("assistant", assistantText, threadKey);
   if (introBeatResolution && threadKey === null) {
@@ -872,5 +961,6 @@ Kelsie attached image(s) on the main thread. For ongoing visual inspo, suggest V
     emailDraft,
     primaryColorPicker,
     coolorsHandoff,
+    vendorCandidates,
   });
 }

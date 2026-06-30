@@ -4,6 +4,18 @@ export interface VendorContact {
   phone: string | null;
 }
 
+/** A vendor option Kelsie has added to a category's shortlist (not yet the booked winner). */
+export interface VendorShortlistEntry {
+  name: string;
+  location: string;
+  url: string;
+  priceHint: string | null;
+  whyFits: string;
+  email: string | null;
+  phone: string | null;
+  addedAt: string;
+}
+
 export interface VendorEntry {
   status: "undecided" | "considering" | "contacted" | "booked";
   name: string | null;
@@ -11,6 +23,8 @@ export interface VendorEntry {
   notes: string | null;
   quoted_cost: number | null;
   booked_cost: number | null;
+  /** Vendors in consideration for this category before one is picked. */
+  shortlist: VendorShortlistEntry[];
 }
 
 export interface WeddingState {
@@ -136,6 +150,23 @@ export interface EmailDraft {
   toName: string | null;
   subject: string;
   body: string;
+}
+
+/** A single vendor option Rosie surfaced via web search. */
+export interface VendorCandidate {
+  name: string;
+  location: string;
+  url: string;
+  priceHint: string | null;
+  whyFits: string;
+  email: string | null;
+  phone: string | null;
+}
+
+/** Ephemeral vendor discovery results returned on the chat API response (not stored in DB). */
+export interface VendorCandidates {
+  vendor: string;
+  items: VendorCandidate[];
 }
 
 export interface Message {

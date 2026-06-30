@@ -52,7 +52,9 @@ export default async function VendorChatPage({
     getWeddingData(),
   ]);
 
-  const status = weddingData.vendors[vendor]?.status ?? "undecided";
+  const vendorEntry = weddingData.vendors[vendor];
+  const status = vendorEntry?.status ?? "undecided";
+  const shortlistCount = vendorEntry?.shortlist.length ?? 0;
 
   return (
     <ChatPageShell
@@ -62,8 +64,14 @@ export default async function VendorChatPage({
         key: vendor,
         label: vendorFocusLabel(vendor),
         status,
+        shortlistCount,
       }}
       openingMessage={vendorOpeningMessage(VENDOR_LABELS[vendor])}
+      suggestedPrompts={
+        shortlistCount > 0
+          ? [`Who's on my ${VENDOR_LABELS[vendor].toLowerCase()} shortlist?`]
+          : []
+      }
     />
   );
 }

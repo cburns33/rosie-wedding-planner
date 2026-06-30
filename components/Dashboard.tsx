@@ -200,47 +200,68 @@ export default function Dashboard({ data }: DashboardProps) {
         <div className="bg-white border border-border rounded-2xl divide-y divide-border">
           {Object.entries(data.vendors).map(([key, vendor]) => (
             <div key={key} className="px-6 py-4">
-              {isVendorKey(key) ? (
-                <Link href={`/chat/${key}`} className={ROW_HOVER}>
-                  <div>
-                    <p className="text-warm-dark text-sm group-hover:text-blush transition-colors">
-                      {VENDOR_LABELS[key]}
-                    </p>
-                    {vendor.name && (
-                      <p className="text-warm-light text-xs">{vendor.name}</p>
-                    )}
-                  </div>
-                  <div className="flex items-center gap-2">
+              {(() => {
+                const showShortlist =
+                  vendor.shortlist.length > 0 && vendor.status === "considering";
+                return isVendorKey(key) ? (
+                  <Link href={`/chat/${key}`} className={ROW_HOVER}>
+                    <div>
+                      <p className="text-warm-dark text-sm group-hover:text-blush transition-colors">
+                        {VENDOR_LABELS[key]}
+                      </p>
+                      {showShortlist ? (
+                        <p className="text-warm-light text-xs">
+                          {vendor.shortlist.map((v) => v.name).join(", ")}
+                        </p>
+                      ) : (
+                        vendor.name && (
+                          <p className="text-warm-light text-xs">{vendor.name}</p>
+                        )
+                      )}
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <span
+                        className={`text-xs px-2.5 py-1 rounded-full capitalize ${STATUS_STYLES[vendor.status]}`}
+                      >
+                        {showShortlist
+                          ? `${vendor.shortlist.length} in consideration`
+                          : vendor.status}
+                      </span>
+                      <span
+                        aria-hidden
+                        className="text-warm-light opacity-0 -translate-x-1 group-hover:opacity-100 group-hover:translate-x-0 transition-[opacity,transform] duration-150"
+                      >
+                        &rarr;
+                      </span>
+                    </div>
+                  </Link>
+                ) : (
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="text-warm-dark text-sm">{key}</p>
+                      {showShortlist ? (
+                        <p className="text-warm-light text-xs">
+                          {vendor.shortlist.map((v) => v.name).join(", ")}
+                        </p>
+                      ) : (
+                        vendor.name && (
+                          <p className="text-warm-light text-xs">{vendor.name}</p>
+                        )
+                      )}
+                    </div>
                     <span
                       className={`text-xs px-2.5 py-1 rounded-full capitalize ${STATUS_STYLES[vendor.status]}`}
                     >
-                      {vendor.status}
-                    </span>
-                    <span
-                      aria-hidden
-                      className="text-warm-light opacity-0 -translate-x-1 group-hover:opacity-100 group-hover:translate-x-0 transition-[opacity,transform] duration-150"
-                    >
-                      &rarr;
+                      {showShortlist
+                        ? `${vendor.shortlist.length} in consideration`
+                        : vendor.status}
                     </span>
                   </div>
-                </Link>
-              ) : (
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-warm-dark text-sm">{key}</p>
-                    {vendor.name && (
-                      <p className="text-warm-light text-xs">{vendor.name}</p>
-                    )}
-                  </div>
-                  <span
-                    className={`text-xs px-2.5 py-1 rounded-full capitalize ${STATUS_STYLES[vendor.status]}`}
-                  >
-                    {vendor.status}
-                  </span>
-                </div>
-              )}
+                );
+              })()}
 
-              {vendor.contact &&
+              {vendor.shortlist.length === 0 &&
+                vendor.contact &&
                 (vendor.contact.name ||
                   vendor.contact.email ||
                   vendor.contact.phone) && (
@@ -259,21 +280,22 @@ export default function Dashboard({ data }: DashboardProps) {
                   </div>
                 )}
 
-              {(vendor.quoted_cost || vendor.booked_cost || vendor.notes) && (
-                <div className="mt-2 text-xs text-warm-light space-y-0.5">
-                  {vendor.quoted_cost && !vendor.booked_cost && (
-                    <p className="tabular-nums">
-                      Quoted: {formatCurrency(vendor.quoted_cost)}
-                    </p>
-                  )}
-                  {vendor.booked_cost && (
-                    <p className="text-sage tabular-nums">
-                      Booked: {formatCurrency(vendor.booked_cost)}
-                    </p>
-                  )}
-                  {vendor.notes && <p>{vendor.notes}</p>}
-                </div>
-              )}
+              {vendor.shortlist.length === 0 &&
+                (vendor.quoted_cost || vendor.booked_cost || vendor.notes) && (
+                  <div className="mt-2 text-xs text-warm-light space-y-0.5">
+                    {vendor.quoted_cost && !vendor.booked_cost && (
+                      <p className="tabular-nums">
+                        Quoted: {formatCurrency(vendor.quoted_cost)}
+                      </p>
+                    )}
+                    {vendor.booked_cost && (
+                      <p className="text-sage tabular-nums">
+                        Booked: {formatCurrency(vendor.booked_cost)}
+                      </p>
+                    )}
+                    {vendor.notes && <p>{vendor.notes}</p>}
+                  </div>
+                )}
             </div>
           ))}
         </div>

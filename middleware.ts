@@ -12,6 +12,7 @@ const SECRET_PROTECTED_PREFIXES = [
   "/api/cron/",
   "/api/integrations/zola/sync",
   "/api/integrations/zola/import",
+  "/api/sentry/",
 ];
 
 export async function middleware(request: NextRequest) {

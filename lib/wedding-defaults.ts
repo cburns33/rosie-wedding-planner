@@ -1,4 +1,17 @@
-import type { WeddingState } from "./types";
+import type { VendorEntry, VendorShortlistEntry, WeddingState } from "./types";
+import { VENDOR_KEYS } from "./vendors";
+
+function defaultVendorEntry(): VendorEntry {
+  return {
+    status: "undecided",
+    name: null,
+    contact: null,
+    notes: null,
+    quoted_cost: null,
+    booked_cost: null,
+    shortlist: [],
+  };
+}
 
 export const DEFAULT_WEDDING_STATE: WeddingState = {
   intro_completed: false,
@@ -26,15 +39,15 @@ export const DEFAULT_WEDDING_STATE: WeddingState = {
     lastZolaImportAt: null,
   },
   vendors: {
-    photographer: { status: "undecided", name: null, contact: null, notes: null, quoted_cost: null, booked_cost: null },
-    videographer: { status: "undecided", name: null, contact: null, notes: null, quoted_cost: null, booked_cost: null },
-    caterer: { status: "undecided", name: null, contact: null, notes: null, quoted_cost: null, booked_cost: null },
-    florist: { status: "undecided", name: null, contact: null, notes: null, quoted_cost: null, booked_cost: null },
-    dj: { status: "undecided", name: null, contact: null, notes: null, quoted_cost: null, booked_cost: null },
-    officiant: { status: "undecided", name: null, contact: null, notes: null, quoted_cost: null, booked_cost: null },
-    cake: { status: "undecided", name: null, contact: null, notes: null, quoted_cost: null, booked_cost: null },
-    hair_makeup: { status: "undecided", name: null, contact: null, notes: null, quoted_cost: null, booked_cost: null },
-    transportation: { status: "undecided", name: null, contact: null, notes: null, quoted_cost: null, booked_cost: null },
+    photographer: defaultVendorEntry(),
+    videographer: defaultVendorEntry(),
+    caterer: defaultVendorEntry(),
+    florist: defaultVendorEntry(),
+    dj: defaultVendorEntry(),
+    officiant: defaultVendorEntry(),
+    cake: defaultVendorEntry(),
+    hair_makeup: defaultVendorEntry(),
+    transportation: defaultVendorEntry(),
   },
   decisions: [],
   aesthetic: {
@@ -78,6 +91,29 @@ function asStringArray(value: unknown): string[] {
   return Array.isArray(value) ? value.filter((item): item is string => typeof item === "string") : [];
 }
 
+function asShortlist(value: unknown): VendorShortlistEntry[] {
+  if (!Array.isArray(value)) return [];
+  return value.filter(
+    (item): item is VendorShortlistEntry =>
+      Boolean(item) && typeof item === "object" && typeof (item as VendorShortlistEntry).name === "string"
+  );
+}
+
+function normalizeVendors(
+  partialVendors: Partial<WeddingState["vendors"]> | undefined
+): WeddingState["vendors"] {
+  const merged: WeddingState["vendors"] = {};
+  for (const key of VENDOR_KEYS) {
+    const partialEntry = partialVendors?.[key];
+    merged[key] = {
+      ...defaultVendorEntry(),
+      ...partialEntry,
+      shortlist: asShortlist(partialEntry?.shortlist),
+    };
+  }
+  return merged;
+}
+
 /** Merge partial DB state with defaults (deep-merge aesthetic). */
 export function mergeWeddingState(partial?: Partial<WeddingState>): WeddingState {
   const partialAesthetic: Partial<WeddingState["aesthetic"]> = partial?.aesthetic ?? {};
@@ -85,6 +121,7 @@ export function mergeWeddingState(partial?: Partial<WeddingState>): WeddingState
   return {
     ...DEFAULT_WEDDING_STATE,
     ...partial,
+    vendors: normalizeVendors(partial?.vendors),
     decisions: Array.isArray(partial?.decisions)
       ? partial.decisions
       : DEFAULT_WEDDING_STATE.decisions,

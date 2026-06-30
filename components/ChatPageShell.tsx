@@ -8,6 +8,7 @@ interface VendorFocus {
   key: string;
   label: string;
   status: string;
+  shortlistCount?: number;
 }
 
 interface InspirationFocus {

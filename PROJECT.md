@@ -195,6 +195,7 @@ Coverage includes Zola logic and intro/aesthetic utilities:
 - `lib/intro-beats.test.ts`, `lib/intro-script.test.ts` — beat resolution and scripted intro copy.
 - `lib/vibe-display.test.ts` — Your vibe card sections, quoted excerpts, finalize fields, vibe decision append.
 - `lib/inspiration.test.ts` — inspo thread key, memory summary, card stats.
+- `lib/vendor-discovery.test.ts` — candidate sanitization (cap to 4, drop invalid urls/missing fields), notes formatter.
 
 ---
 
@@ -221,7 +222,7 @@ Derived UI logic lives in `lib/planning-utils.ts` (`getUpNext`, `getMilestones`,
 4. Call Anthropic with thread-appropriate tools (`getTools()`).
 5. Tool loop (up to 3 in vendor focus, **5 on main thread**): process tool calls, re-fetch state, continue until done.
 6. Save user + assistant messages (text-only in DB; image uploads stored as “Uploaded N inspiration screenshot(s)”).
-7. Return `{ message, suggestFocus?, emailDraft?, primaryColorPicker?, coolorsHandoff? }` — sidecar fields are ephemeral (not stored in `messages`). Primary picks are saved via `primaryPicks` on the same POST (also sets `coolorsHandoff` with a 5-color starter URL). Coolors Export → URL paste auto-applies palette server-side.
+7. Return `{ message, suggestFocus?, emailDraft?, primaryColorPicker?, coolorsHandoff?, vendorCandidates? }` — sidecar fields are ephemeral (not stored in `messages`). Primary picks are saved via `primaryPicks` on the same POST (also sets `coolorsHandoff` with a 5-color starter URL). Coolors Export → URL paste auto-applies palette server-side. A vendor candidate is saved via `saveVendorCandidate` on the same POST (mirrors `primaryPicks`).
 
 ### Tools
 
@@ -235,6 +236,8 @@ Derived UI logic lives in `lib/planning-utils.ts` (`getUpNext`, `getMilestones`,
 | `note_for_vendor` | vendor focus | Append a note to another vendor's memory |
 | `suggest_vendor_focus` | main chat only | Return `{ vendor, label }` for UI handoff link |
 | `get_zola_summary` | all threads | Aggregate RSVP/registry figures from latest Zola snapshot |
+| `web_search` (server tool, `web_search_20250305`) | vendor focus | Anthropic-run web search; results resolve inline, no custom search provider |
+| `present_vendor_candidates` | vendor focus | Surface 2–4 real vendor options as selectable cards after a search |
 
 **Principle:** conversations are scoped; facts are global. Kelsie can mention the florist while in the caterer focus and Rosie still writes to `vendors.florist.*`.
 
@@ -242,8 +245,9 @@ Derived UI logic lives in `lib/planning-utils.ts` (`getUpNext`, `getMilestones`,
 
 - Nine vendors: keys in `lib/vendors.ts` (`VENDOR_KEYS`, labels, `vendorFocusLabel()`).
 - User-facing term: **focus** ("your caterer focus"), not "agent" or "thread".
-- Internal memory template headings in `lib/system-prompt.ts` (`VENDOR_MEMORY_TEMPLATE`).
+- Internal memory template headings in `lib/system-prompt.ts` (`VENDOR_MEMORY_TEMPLATE`), including `## Research` for vendor discovery.
 - First open of a focus shows a contextual opener (`vendorOpeningMessage()`); not the signature intro.
+- **Vendor discovery:** inside a vendor focus, Kelsie can ask Rosie to find vendors. Rosie calls `web_search` then `present_vendor_candidates` (2–4 options grounded in venue/budget/vibe); candidates render as `VendorCandidatesCard.tsx`, sanitized via `lib/vendor-discovery.ts` (caps to 4, drops invalid urls, never invents contact info). Candidates are ephemeral (`vendorCandidates` sidecar on the chat response, mirrors `emailDraft`) — not persisted until Kelsie taps **Save to considering**, which re-POSTs `/api/chat` with `saveVendorCandidate` (mirrors the `primaryPicks` round-trip). Saving **appends** to `vendors.<key>.shortlist[]` (deduped by url; each entry has name/location/url/priceHint/whyFits/email/phone/addedAt) — multiple vendors can be in consideration for the same category at once, not just one. First save also flips `status` from `undecided` to `considering`. A `## Research` line is appended to `vendor_memory` per save. Dashboard and the vendor focus header show a "N in consideration" tag (not the full list) when `status === "considering"` and `shortlist.length > 0`. Opening a vendor focus with a non-empty shortlist surfaces a suggested prompt ("Who's on my \<vendor\> shortlist?"); Rosie answers from `vendors.<key>.shortlist` in state, not a dedicated tool. Vendor lifecycle: discover → considering (shortlist) → contacted → booked.
 
 ### First visit vs. returning
 
@@ -346,6 +350,7 @@ components/
   ChatPageShell.tsx           nav + ChatInterface wrapper
   ChatInterface.tsx           messages, vendor header, sidecar cards (email, primary picker, Coolors)
   VendorEmailDraftCard.tsx    inline vendor email draft (Copy / Open in email)
+  VendorCandidatesCard.tsx    inline vendor discovery cards (Save to considering)
   MessageBubble.tsx           wraps FormattedMessage for assistant text
   ChatInput.tsx
   GuideBulletList.tsx         numbered/flower/dash bullet list for guide page
@@ -370,6 +375,8 @@ lib/
   colors/                     inferStarterPalette, coolors URL parse/gen, apply-palette-state, primary-colors presets, theme vars
   vendor-email.ts             mailto URL builder, length guard, clipboard helper
   vendor-email.test.ts        unit tests for mailto encoding + length guard
+  vendor-discovery.ts         sanitizeCandidates(), url validation, notes formatter
+  vendor-discovery.test.ts    unit tests: cap to 4, drop invalid urls, strip empty fields, notes string
   deep-set.ts, supabase.ts, auth.ts, supabase-env.ts
   zola/                       Zola integration (read-only)
     client.ts                 mobile API auth + read-only fetch

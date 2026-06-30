@@ -144,7 +144,10 @@ Bullets: what we still need from her or from vendors.
 Single sentence to resume this focus.
 
 ## Outreach
-Bullets: date, recipient, purpose (inquiry / follow-up), subject line — drafts prepared for Kelsie to send herself. Not a sent log unless she confirms she sent it.`;
+Bullets: date, recipient, purpose (inquiry / follow-up), subject line — drafts prepared for Kelsie to send herself. Not a sent log unless she confirms she sent it.
+
+## Research
+Dated bullets: vendors surfaced/considered, source URLs, price signals. Not a booking log.`;
 
 export interface VendorFocusContext {
   key: string;
@@ -260,6 +263,14 @@ ${stateBlock}${zolaBlock}${inspoDepotBlock}`;
 This conversation is dedicated to the ${vendorFocus.label.replace(/^your /, "")}. Stay focused here. Greet and continue in context using the state and your running memory below. This focus is the natural place to draft outreach emails for this vendor.
 
 Cross-talk: if Kelsie brings up a different vendor, still capture real facts to the global wedding state via \`update_wedding_data\` (they land in the right slot regardless of which focus you're in). For a stray aside worth remembering elsewhere, call \`note_for_vendor\` to drop a short note into that other vendor's memory. If she clearly wants to shift the whole conversation to a different vendor, offer warmly to pick it up in that focus instead.
+
+**Finding vendors (vendor focus only)**
+
+When Kelsie asks you to find, suggest, or research vendors, use web_search to look for real local options, then call present_vendor_candidates with 2-4 of the best. Ground every search in her real wedding: Boxwood Manor in Tomball TX (Houston area), spring 2027, ~250–300 guests, her budget for this category, and her vibe (bright, classy, timeless, hydrangea-forward).
+
+Only include contact email/phone if you actually see it on the vendor's own page — never guess one. Add a source URL for every candidate. Keep your chat text to a one-line intro plus a reminder to verify details on their site; let the cards carry the specifics.
+
+When she saves a candidate, it's added to this category's shortlist (\`vendors.<key>.shortlist\` in state) — not a single pick. She can save several before choosing one. After a save, briefly acknowledge and offer to draft an inquiry email to that specific business (use \`to_email\`/\`to_name\` on \`draft_vendor_email\` from the shortlist entry's saved contact info if present; otherwise ask her for it once). If she asks who's on her shortlist or list/recap her options, answer naturally from \`vendors.<key>.shortlist\` in state — name, location, and why it fit, not raw JSON. Don't recite the whole shortlist unprompted.
 
 Keep your running memory current: after meaningful turns, call \`update_vendor_memory\` with the full updated markdown for this vendor, using exactly these headings:
 
@@ -436,6 +447,56 @@ const SHOW_PRIMARY_COLOR_PICKER_TOOL = {
   },
 };
 
+export const WEB_SEARCH_TOOL = {
+  type: "web_search_20250305" as const,
+  name: "web_search" as const,
+  max_uses: 4,
+  user_location: {
+    type: "approximate" as const,
+    city: "Houston",
+    region: "Texas",
+    country: "US",
+    timezone: "America/Chicago",
+  },
+};
+
+const PRESENT_VENDOR_CANDIDATES_TOOL = {
+  name: "present_vendor_candidates",
+  description:
+    "Show Kelsie a short list of real vendor options you found via web_search, as selectable cards. Call only after searching, in a vendor focus chat. Include 2-4 candidates grounded in her venue, area, budget, and vibe.",
+  input_schema: {
+    type: "object" as const,
+    properties: {
+      candidates: {
+        type: "array",
+        items: {
+          type: "object",
+          properties: {
+            name: { type: "string", description: "Vendor business name." },
+            location: { type: "string", description: "City/area." },
+            url: { type: "string", description: "Source result URL (their site or a listing)." },
+            priceHint: {
+              type: "string",
+              description: "Optional price signal if found; omit if unknown. Never guess.",
+            },
+            whyFits: {
+              type: "string",
+              description: "One line tying to her vibe/venue/budget.",
+            },
+            email: {
+              type: "string",
+              description: "Only if found on their own site/result. Omit otherwise.",
+            },
+            phone: { type: "string", description: "Only if found. Omit otherwise." },
+          },
+          required: ["name", "location", "url", "whyFits"],
+        },
+      },
+    },
+    required: ["candidates"],
+  },
+};
+
 const UPDATE_INSPIRATION_MEMORY_TOOL = {
   name: "update_inspiration_memory",
   description:
@@ -463,6 +524,8 @@ export function getTools(focus?: {
   if (focus?.vendorKey) {
     return [
       ...WEDDING_TOOLS,
+      WEB_SEARCH_TOOL,
+      PRESENT_VENDOR_CANDIDATES_TOOL,
       DRAFT_VENDOR_EMAIL_TOOL,
       NOTE_FOR_VENDOR_TOOL,
       UPDATE_VENDOR_MEMORY_TOOL,

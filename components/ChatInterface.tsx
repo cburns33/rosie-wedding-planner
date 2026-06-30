@@ -5,11 +5,19 @@ import { useRouter } from "next/navigation";
 import MessageBubble from "./MessageBubble";
 import ChatInput from "./ChatInput";
 import Link from "next/link";
-import type { EmailDraft, Message, PrimaryColorPicker, CoolorsHandoff } from "@/lib/types";
+import type {
+  EmailDraft,
+  Message,
+  PrimaryColorPicker,
+  CoolorsHandoff,
+  VendorCandidate,
+  VendorCandidates,
+} from "@/lib/types";
 import CoolorsHandoffCard from "./CoolorsHandoffCard";
 import { primaryColorLabel } from "@/lib/colors/primary-colors";
 import VendorEmailDraftCard from "./VendorEmailDraftCard";
 import PrimaryColorPickerCard from "./PrimaryColorPickerCard";
+import VendorCandidatesCard from "./VendorCandidatesCard";
 import { isInspirationThreadKey } from "@/lib/inspiration";
 import {
   estimateChatPayloadBytes,
@@ -26,6 +34,7 @@ interface VendorFocus {
   key: string;
   label: string;
   status: string;
+  shortlistCount?: number;
 }
 
 interface InspirationFocus {
@@ -40,6 +49,18 @@ interface ChatInterfaceProps {
   openingMessage?: string;
   initialPrimaryColorPicker?: PrimaryColorPicker | null;
   suggestedPrompts?: string[];
+}
+
+function addToSet(setter: (fn: (prev: Set<string>) => Set<string>) => void, value: string) {
+  setter((prev) => new Set(prev).add(value));
+}
+
+function removeFromSet(setter: (fn: (prev: Set<string>) => Set<string>) => void, value: string) {
+  setter((prev) => {
+    const next = new Set(prev);
+    next.delete(value);
+    return next;
+  });
 }
 
 const STATUS_STYLES: Record<string, string> = {
@@ -81,17 +102,21 @@ export default function ChatInterface({
     initialPrimaryColorPicker
   );
   const [coolorsHandoff, setCoolorsHandoff] = useState<CoolorsHandoff | null>(null);
+  const [vendorCandidates, setVendorCandidates] = useState<VendorCandidates | null>(null);
+  const [savingCandidateUrls, setSavingCandidateUrls] = useState<Set<string>>(new Set());
+  const [savedCandidateUrls, setSavedCandidateUrls] = useState<Set<string>>(new Set());
   const bottomRef = useRef<HTMLDivElement>(null);
   const hasStoredInitial = useRef(initialMessages.length > 0);
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [messages, primaryColorPicker, coolorsHandoff]);
+  }, [messages, primaryColorPicker, coolorsHandoff, vendorCandidates]);
 
   async function sendMessage(
     text: string,
     images?: string[],
-    primaryPicks?: string[]
+    primaryPicks?: string[],
+    saveVendorCandidate?: VendorCandidate
   ) {
     if (messageContainsEmbeddedImage(text)) {
       setMessages((prev) => [
@@ -105,15 +130,18 @@ export default function ChatInterface({
       return;
     }
 
-    setMessages((prev) => [
-      ...prev,
-      {
-        role: "user",
-        content: text || (images?.length ? "(Uploaded inspiration screenshot)" : ""),
-      },
-    ]);
+    if (!saveVendorCandidate) {
+      setMessages((prev) => [
+        ...prev,
+        {
+          role: "user",
+          content: text || (images?.length ? "(Uploaded inspiration screenshot)" : ""),
+        },
+      ]);
+    }
     setEmailDraft(null);
     setCoolorsHandoff(null);
+    if (!saveVendorCandidate) setVendorCandidates(null);
     setLoading(true);
 
     try {
@@ -121,6 +149,7 @@ export default function ChatInterface({
       if (threadKey) body.threadKey = threadKey;
       if (images && images.length > 0) body.images = images;
       if (primaryPicks && primaryPicks.length === 2) body.primaryPicks = primaryPicks;
+      if (saveVendorCandidate) body.saveVendorCandidate = saveVendorCandidate;
       if (openingMessage && !hasStoredInitial.current) {
         body.initialMessage = openingMessage;
         hasStoredInitial.current = true;
@@ -169,6 +198,9 @@ export default function ChatInterface({
                 : fallback,
           },
         ]);
+        if (saveVendorCandidate) {
+          removeFromSet(setSavingCandidateUrls, saveVendorCandidate.url);
+        }
         return;
       }
       const replyMessage =
@@ -190,6 +222,13 @@ export default function ChatInterface({
         if (data.coolorsHandoff) {
           setCoolorsHandoff(data.coolorsHandoff as CoolorsHandoff);
         }
+        if (data.vendorCandidates) {
+          setVendorCandidates(data.vendorCandidates as VendorCandidates);
+        }
+        if (saveVendorCandidate) {
+          removeFromSet(setSavingCandidateUrls, saveVendorCandidate.url);
+          addToSet(setSavedCandidateUrls, saveVendorCandidate.url);
+        }
         router.refresh();
         window.dispatchEvent(new Event("wedding-state-updated"));
         if (typeof data.redirectTo === "string" && data.redirectTo) {
@@ -210,6 +249,9 @@ export default function ChatInterface({
           ? "That screenshot didn't go through — try the attach button again with a smaller image."
           : "Something went wrong. Try again in a moment.";
       setMessages((prev) => [...prev, { role: "assistant", content }]);
+      if (saveVendorCandidate) {
+        removeFromSet(setSavingCandidateUrls, saveVendorCandidate.url);
+      }
     } finally {
       setLoading(false);
     }
@@ -219,6 +261,11 @@ export default function ChatInterface({
     setPrimaryColorPicker(null);
     const labels = picks.map((hex) => primaryColorLabel(hex)).join(" and ");
     sendMessage(`I've picked ${labels} as my two primary colors.`, undefined, picks);
+  }
+
+  function handleSaveCandidate(candidate: VendorCandidate) {
+    addToSet(setSavingCandidateUrls, candidate.url);
+    sendMessage("", undefined, undefined, candidate);
   }
 
   return (
@@ -235,7 +282,9 @@ export default function ChatInterface({
                   STATUS_STYLES[vendorFocus.status] ?? STATUS_STYLES.undecided
                 }`}
               >
-                {vendorFocus.status}
+                {vendorFocus.shortlistCount && vendorFocus.status === "considering"
+                  ? `${vendorFocus.shortlistCount} in consideration`
+                  : vendorFocus.status}
               </span>
             </div>
             <Link
@@ -289,6 +338,15 @@ export default function ChatInterface({
           )}
 
           {emailDraft && <VendorEmailDraftCard draft={emailDraft} />}
+
+          {vendorCandidates && (
+            <VendorCandidatesCard
+              data={vendorCandidates}
+              onSave={handleSaveCandidate}
+              savingUrls={savingCandidateUrls}
+              savedUrls={savedCandidateUrls}
+            />
+          )}
 
           {coolorsHandoff && <CoolorsHandoffCard url={coolorsHandoff.url} />}
 
