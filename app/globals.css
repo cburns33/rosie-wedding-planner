@@ -68,10 +68,13 @@ body {
   border-radius: 3px;
 }
 
-/* Planning home — split + staggered entrance. Each section sets its own delay. */
+/* Planning home — split + staggered entrance. Each section sets its own delay.
+   No `filter` here: a held `filter` (even blur(0)) from animation-fill-mode:
+   forwards keeps each card on its own raster layer and renders text permanently
+   soft on fractional-DPI displays ("blurry in the middle"). Fade + rise only. */
 @keyframes briefingIn {
-  0%   { opacity: 0; transform: translateY(12px); filter: blur(4px); }
-  100% { opacity: 1; transform: translateY(0);    filter: blur(0); }
+  0%   { opacity: 0; transform: translateY(12px); }
+  100% { opacity: 1; transform: translateY(0); }
 }
 
 .briefing-item {
